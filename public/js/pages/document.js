@@ -1,0 +1,219 @@
+import { api } from '../api.js';
+import { esc, cover, toast, modal, confirmBox, formData, fmtDate, plural, $, $$, debounce } from '../ui.js';
+import { state, navigate, isAdmin, typeLabel } from '../state.js';
+import { addToListDialog } from './catalogue.js';
+
+const STATES = { ok: 'Bon état', abime: 'Abîmé', perdu: 'Perdu', reparation: 'En réparation' };
+
+export async function render(app, { path, params }) {
+  if (path === '/document/nouveau') return renderForm(app, null);
+  const doc = await api.get(`/documents/${params[0]}`);
+  if (path.endsWith('/modifier')) return renderForm(app, doc);
+  return renderDetail(app, doc);
+}
+
+function renderDetail(app, d) {
+  const staff = state.user.role !== 'eleve';
+  const meta = [
+    ['Auteur(s)', d.authors], ['Éditeur', d.publisher], ['Année', d.pub_year], ['Pages', d.pages],
+    ['Collection', d.series ? d.series + (d.series_number ? ' n° ' + d.series_number : '') : ''],
+    ['Type', typeLabel(d.doc_type)], ['Sujets', d.subjects], ['Public', d.audience], ['Dewey', d.dewey],
+    ['ISBN / EAN', d.isbn], ['Emplacement', d.location], ...(staff ? [['Notes', d.notes], ['Prêts au total', d.loan_count]] : []),
+  ].filter(([, v]) => v !== null && v !== undefined && v !== '');
+
+  app.innerHTML = `
+    <div class="page-head no-print"><a href="javascript:history.back()" class="btn btn-ghost">← Retour</a>
+      ${staff ? `<div class="row">
+        <button class="btn" id="to-list">📋 Ajouter à une liste</button>
+        <a class="btn" href="#/document/${d.id}/modifier">✏️ Modifier</a>
+        ${isAdmin() ? '<button class="btn btn-danger" id="del">🗑️ Supprimer</button>' : ''}</div>` : ''}</div>
+    <div class="card doc-detail">
+      <div>${cover(d, 'cover-lg')}</div>
+      <div>
+        <h1>${esc(d.title)}</h1>
+        ${d.subtitle ? `<p class="muted" style="margin:0">${esc(d.subtitle)}</p>` : ''}
+        <p><span class="cote" style="font-size:1.2rem">${esc(d.cote ?? '')}</span>
+          <span class="badge ${d.available_count ? 'badge-ok' : 'badge-late'}" style="margin-left:.5rem">
+          ${d.available_count ? `${plural(d.available_count, 'exemplaire disponible', 'exemplaires disponibles')}` : 'Tous les exemplaires sont empruntés'}</span></p>
+        ${d.summary ? `<p>${esc(d.summary)}</p>` : ''}
+        <dl class="meta-list">${meta.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+        ${d.source_url ? `<p class="small"><a href="${esc(d.source_url)}" target="_blank" rel="noopener">Voir la notice d'origine (${esc(d.source)})</a></p>` : ''}
+        ${d.lists?.length ? `<p class="small">Listes : ${d.lists.map((l) => `<a href="#/liste/${l.id}">${esc(l.name)}</a>`).join(', ')}</p>` : ''}
+      </div>
+    </div>
+    ${staff ? `<div class="card"><div class="row"><h2 class="grow" style="margin:0">Exemplaires</h2>
+        <button class="btn btn-sm" id="add-copy">➕ Ajouter un exemplaire</button></div>
+      <div class="table-wrap" style="margin-top:.8rem"><table><thead><tr><th>Code-barres</th><th>État</th><th>Acquis le</th><th>Situation</th><th></th></tr></thead>
+      <tbody>${d.copies.map((c) => `<tr>
+        <td><b>${esc(c.barcode)}</b></td>
+        <td><select class="copy-state" data-id="${c.id}" style="width:auto">${Object.entries(STATES).map(([k, l]) =>
+          `<option value="${k}" ${c.state === k ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
+        <td>${fmtDate(c.acquired_at)}</td>
+        <td>${c.loan_id ? `<a href="#/usager/${c.user_id}">${esc(c.borrower)}</a> <span class="muted small">${esc(c.borrower_class ?? '')}</span><br>
+          <span class="small ${c.due_at < today() ? 'badge badge-late' : 'muted'}">à rendre le ${fmtDate(c.due_at)}</span>` : '<span class="badge badge-ok">En rayon</span>'}</td>
+        <td class="num">${isAdmin() && !c.loan_id ? `<button class="icon-btn del-copy" data-id="${c.id}" title="Supprimer l'exemplaire">🗑️</button>` : ''}</td>
+      </tr>`).join('') || '<tr><td colspan="5" class="muted">Aucun exemplaire</td></tr>'}</tbody></table></div></div>` : ''}`;
+
+  if (!staff) return;
+  $('#to-list').onclick = () => addToListDialog([d.id]);
+  if ($('#del')) $('#del').onclick = async () => {
+    if (!(await confirmBox(`Supprimer « ${d.title} » et ses ${d.copies.length} exemplaire(s) ?`, { ok: 'Supprimer', danger: true }))) return;
+    try { await api.del(`/documents/${d.id}`); toast('Document supprimé'); navigate('#/catalogue'); } catch (e) { toast(e.message, 'error'); }
+  };
+  $('#add-copy').onclick = () => {
+    const dlg = modal('Ajouter des exemplaires', `<form class="grid" id="f">
+      <label>Code-barres (laisser vide pour une numérotation automatique)<input name="barcode" placeholder="Scanner l'étiquette…" autofocus></label>
+      <label>Nombre d'exemplaires (numérotation automatique)<input name="count" type="number" min="1" max="50" value="1"></label>
+      <div class="actions"><button type="button" class="btn" data-close>Annuler</button><button class="btn btn-primary">Ajouter</button></div></form>`);
+    $('#f', dlg).onsubmit = async (e) => {
+      e.preventDefault();
+      const f = formData(e.target);
+      try {
+        const r = await api.post(`/documents/${d.id}/copies`, f.barcode ? { barcode: f.barcode } : { count: Number(f.count) });
+        dlg.close(); toast(`Ajouté : ${r.barcodes.join(', ')}`); navigate(location.hash);
+      } catch (err) { toast(err.message, 'error'); }
+    };
+  };
+  for (const sel of $$('.copy-state')) {
+    sel.onchange = async () => {
+      try { await api.put(`/copies/${sel.dataset.id}`, { state: sel.value }); toast('État mis à jour'); } catch (e) { toast(e.message, 'error'); }
+    };
+  }
+  for (const b of $$('.del-copy')) {
+    b.onclick = async () => {
+      if (!(await confirmBox('Supprimer cet exemplaire ?', { ok: 'Supprimer', danger: true }))) return;
+      try { await api.del(`/copies/${b.dataset.id}`); navigate(location.hash); } catch (e) { toast(e.message, 'error'); }
+    };
+  }
+}
+
+function today() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function renderForm(app, doc) {
+  const d = doc ?? { doc_type: 'album' };
+  const types = Object.entries(state.meta.doc_types);
+  const field = (name, label, attrs = '', cls = '') => `<label class="${cls}">${label}<input name="${name}" value="${esc(d[name] ?? '')}" ${attrs}></label>`;
+  app.innerHTML = `
+    <div class="page-head"><h1>${doc ? 'Modifier la notice' : 'Ajouter un document'}</h1>
+      <a href="${doc ? `#/document/${doc.id}` : '#/catalogue'}" class="btn btn-ghost">Annuler</a></div>
+    ${doc ? '' : `<form class="isbn-box" id="isbn-form">
+      <label>Scanner ou saisir l'ISBN / EAN<input name="isbn" id="isbn-input" inputmode="numeric" placeholder="978…" autofocus></label>
+      <button class="btn btn-primary">🔎 Chercher la notice</button></form>
+      <div id="isbn-result"></div>`}
+    <form class="card" id="doc-form">
+      <div class="grid grid-4">
+        <label class="span-2">Titre *<input name="title" value="${esc(d.title ?? '')}" required></label>
+        ${field('subtitle', 'Sous-titre', '', 'span-2')}
+        <label class="span-2">Auteur(s) <span class="muted small">— « Nom, Prénom » séparés par « ; »</span>
+          <input name="authors" value="${esc(d.authors ?? '')}" placeholder="Dahl, Roald ; Blake, Quentin"></label>
+        ${field('publisher', 'Éditeur')}
+        ${field('pub_year', 'Année', 'type="number" min="1500" max="2100"')}
+        <label>Type de document<select name="doc_type">${types.map(([k, t]) =>
+          `<option value="${k}" ${d.doc_type === k ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select></label>
+        ${field('series', 'Collection / série')}
+        ${field('series_number', 'N° dans la série')}
+        ${field('pages', 'Pages', 'type="number" min="0"')}
+        <label class="span-2">Sujets <span class="muted small">— séparés par « ; »</span><input name="subjects" value="${esc(d.subjects ?? '')}"></label>
+        ${field('dewey', 'Indice Dewey', 'placeholder="590"')}
+        ${field('audience', 'Public / niveau', 'placeholder="Cycle 2, dès 6 ans…"')}
+        <div class="cote-field span-2"><label>Cote <input name="cote" id="cote" value="${esc(d.cote ?? '')}" placeholder="Calculée automatiquement"></label>
+          <button type="button" class="btn" id="calc-cote" title="Recalculer la cote">🔁 Calculer</button></div>
+        ${field('location', 'Emplacement', 'placeholder="Bac albums, étagère 3…"')}
+        ${field('isbn', 'ISBN / EAN')}
+        <label class="span-all">Résumé<textarea name="summary" rows="3">${esc(d.summary ?? '')}</textarea></label>
+        <label class="span-2">Image de couverture (adresse web)<input name="cover_url" value="${esc(d.cover_url ?? '')}"></label>
+        <label class="span-2">Notes internes<input name="notes" value="${esc(d.notes ?? '')}"></label>
+        ${doc ? '' : `<label>Nombre d'exemplaires<input name="copies" type="number" min="0" max="50" value="1"></label>
+        <label class="span-2">Codes-barres des exemplaires <span class="muted small">— facultatif, séparés par des espaces</span>
+          <input name="barcodes" placeholder="Laisser vide : numérotation automatique"></label>`}
+        <input type="hidden" name="source" value="${esc(d.source ?? '')}">
+        <input type="hidden" name="source_url" value="${esc(d.source_url ?? '')}">
+      </div>
+      <div class="actions">
+        ${doc ? '' : '<label class="check" style="margin-right:auto"><input type="checkbox" id="again" checked> Enchaîner avec un autre document</label>'}
+        <button class="btn btn-primary btn-lg">💾 Enregistrer</button></div>
+    </form>`;
+
+  const form = $('#doc-form');
+  let coteTouched = Boolean(doc?.cote);
+  const recompute = async (force) => {
+    if (coteTouched && !force) return;
+    try {
+      const { cote } = await api.post('/cote', formData(form));
+      form.cote.value = cote;
+    } catch { /* ignore */ }
+  };
+  const auto = debounce(() => recompute(false), 300);
+  for (const n of ['title', 'authors', 'doc_type', 'series', 'dewey', 'subjects']) form[n].addEventListener('input', auto);
+  form.doc_type.addEventListener('change', auto);
+  form.cote.addEventListener('input', () => { coteTouched = form.cote.value.trim() !== ''; });
+  $('#calc-cote').onclick = () => { coteTouched = false; recompute(true); };
+
+  const fill = (n) => {
+    for (const [k, v] of Object.entries(n)) {
+      if (form[k] && v !== null && v !== undefined && form[k].type !== 'checkbox') form[k].value = v;
+    }
+    coteTouched = false;
+  };
+
+  const isbnForm = $('#isbn-form');
+  if (isbnForm) {
+    isbnForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const isbn = isbnForm.isbn.value.trim();
+      if (!isbn) return;
+      const box = $('#isbn-result');
+      box.innerHTML = '<p class="muted">Recherche de la notice (BnF, Open Library, Google Books)…</p>';
+      try {
+        const r = await api.get(`/isbn/${encodeURIComponent(isbn)}`);
+        if (r.error) { box.innerHTML = `<p class="badge badge-late">${esc(r.error)}</p>`; return; }
+        let html = '';
+        if (r.local) {
+          html += `<div class="card" style="background:var(--warn-soft)">⚠️ Ce document est déjà au catalogue :
+            <a href="#/document/${r.local.id}">${esc(r.local.title)}</a> <span class="cote">${esc(r.local.cote ?? '')}</span>
+            <button class="btn btn-sm" id="add-copy-existing" style="margin-left:.5rem">➕ Ajouter un exemplaire</button></div>`;
+        }
+        if (r.found) {
+          form.reset();
+          fill(r.notice);
+          html += `<p class="notice-source">✅ Notice trouvée (${esc({ bnf: 'BnF', openlibrary: 'Open Library', google: 'Google Books' }[r.notice.source] ?? r.notice.source)}).
+            Vérifiez le type de document et la cote, puis enregistrez.</p>`;
+        } else {
+          form.reset();
+          form.isbn.value = r.isbn;
+          html += `<p class="notice-source">Aucune notice trouvée pour ${esc(r.isbn)}${r.errors?.length ? ` (${esc(r.errors.join(' ; '))})` : ''}. Saisissez-la à la main.</p>`;
+        }
+        box.innerHTML = html;
+        const addBtn = $('#add-copy-existing');
+        if (addBtn) addBtn.onclick = async () => {
+          const res = await api.post(`/documents/${r.local.id}/copies`, { count: 1 });
+          toast(`Exemplaire ${res.barcodes[0]} ajouté`);
+          isbnForm.reset(); box.innerHTML = ''; isbnForm.isbn.focus();
+        };
+        if (r.found && !r.local) form.title.focus();
+      } catch (err) { box.innerHTML = `<p class="badge badge-late">${esc(err.message)}</p>`; }
+    };
+  }
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const data = formData(form);
+    const again = $('#again')?.checked;
+    if (data.barcodes !== undefined) data.barcodes = data.barcodes.split(/[\s,;]+/).filter(Boolean);
+    if (data.copies !== undefined) data.copies = Number(data.copies);
+    try {
+      if (doc) {
+        await api.put(`/documents/${doc.id}`, data);
+        toast('Notice enregistrée');
+        navigate(`#/document/${doc.id}`);
+      } else {
+        const r = await api.post('/documents', data);
+        toast(`Ajouté — cote ${r.cote}${r.barcodes.length ? ` · ${r.barcodes.join(', ')}` : ''}`);
+        navigate(again ? '#/document/nouveau' : `#/document/${r.id}`);
+      }
+    } catch (err) { toast(err.message, 'error'); }
+  };
+}

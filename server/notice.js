@@ -89,11 +89,18 @@ export function unimarcToNotice(fields) {
   };
 }
 
+let fetchImpl = (...a) => fetch(...a);
+
+/** Remplace la fonction réseau (l'application Windows utilise celle d'Electron, qui suit le proxy du système). */
+export function setFetch(fn) {
+  fetchImpl = fn;
+}
+
 async function fetchWithTimeout(url) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
-    return await fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'BCD-gestion/1.0' } });
+    return await fetchImpl(url, { signal: ctrl.signal, headers: { 'User-Agent': 'BCD-gestion/1.0' } });
   } finally {
     clearTimeout(t);
   }

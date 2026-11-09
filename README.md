@@ -3,11 +3,35 @@
 Application web pour gérer la BCD (bibliothèque centre documentaire) d'une école primaire :
 catalogue, notices BnF par ISBN, prêts, usagers, import ONDE, parcours adaptés aux élèves.
 
-Aucune dépendance à installer : il suffit de **Node.js 22.13 ou plus récent** (base SQLite intégrée).
+## Application Windows (recommandé)
+
+Un installateur `Installer-BCD-x.y.z.exe` est fabriqué automatiquement par GitHub à chaque modification
+(onglet **Actions** → dernière exécution « Application Windows » → rubrique **Artifacts**,
+ou onglet **Releases** pour les versions publiées).
+
+- **Installation** : double-clic sur l'installateur, sans droits administrateur. Une icône BCD apparaît sur le bureau.
+  Windows peut afficher « Windows a protégé votre ordinateur » (application non signée) :
+  cliquer sur *Informations complémentaires* puis *Exécuter quand même*.
+- **Tout est inclus** : pas de Node.js ni de base de données à installer.
+- L'application n'est accessible que depuis cet ordinateur (rien n'est ouvert sur le réseau).
+  Internet sert seulement à récupérer les notices BnF et les couvertures.
+- **Données** : `Documents\BCD\bcd.sqlite`.
+- **Sauvegardes** : automatiques à chaque fermeture (les 15 dernières, dans `Documents\BCD\Sauvegardes`),
+  manuelles et restauration depuis *Paramètres → Sauvegardes*.
+- **Mise à jour** : lancer le nouvel installateur ; les données sont conservées.
+  La désinstallation (Paramètres Windows → Applications) ne supprime pas le dossier `Documents\BCD`.
+
+Pour publier une version dans l'onglet *Releases* : changer `version` dans `package.json`,
+puis créer une étiquette `vX.Y.Z` (ex. `git tag v1.0.1 && git push --tags`).
+
+## Version serveur (développement)
+
+Il suffit de **Node.js 22.13 ou plus récent** (base SQLite intégrée).
 
 ```bash
 npm start          # http://localhost:3000
 npm test           # tests automatiques
+npm run app        # lancer l'application de bureau (après npm install)
 ```
 
 Au premier lancement, l'application demande de créer le compte administrateur.
@@ -51,6 +75,8 @@ Derrière un proxy (réseau académique…) : `NODE_USE_ENV_PROXY=1 HTTPS_PROXY=
 ## Organisation du code
 
 ```
+electron/          application de bureau Windows (fenêtre, menu, sauvegardes automatiques)
+build/             icône de l'application
 server/            API HTTP (Node.js, sans dépendance)
   routes/          auth, documents (catalogue, ISBN, désherbage), loans, users (import ONDE), lists, admin
   notice.js        récupération des notices BnF / Open Library / Google Books

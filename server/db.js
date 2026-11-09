@@ -129,9 +129,13 @@ export function openDb(file) {
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   db.function('norm', { deterministic: true }, (s) => normalize(s));
   db.exec(SCHEMA);
+  ensureDefaults(db);
+  return db;
+}
+
+export function ensureDefaults(db) {
   const ins = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
   for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) ins.run(k, v);
-  return db;
 }
 
 export function getSettings(db) {

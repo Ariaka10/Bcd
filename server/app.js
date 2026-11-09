@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Router, readJson, parseCookies, sendJson, serveStatic } from './http.js';
+import { Router, readJson, readRaw, parseCookies, sendJson, serveStatic } from './http.js';
 import { HttpError } from './util.js';
 import { SESSION_COOKIE } from './guards.js';
 import authRoutes from './routes/auth.js';
@@ -21,9 +21,13 @@ function loadUser(db, token) {
   return row ?? null;
 }
 
-export function createApp(db, { lookupIsbn } = {}) {
+/**
+ * Options : `lookupIsbn` (recherche de notices, remplaçable pour les tests),
+ * `backupDir` (dossier des sauvegardes automatiques, version bureau).
+ */
+export function createApp(db, { lookupIsbn, backupDir } = {}) {
   const router = new Router();
-  const deps = { lookupIsbn };
+  const deps = { lookupIsbn, backupDir };
   authRoutes(router, deps);
   documentRoutes(router, deps);
   loanRoutes(router, deps);
@@ -42,11 +46,13 @@ export function createApp(db, { lookupIsbn } = {}) {
       if (!match) throw new HttpError(404, 'Route inconnue');
 
       const cookies = parseCookies(req.headers.cookie);
+      const isRaw = req.headers['content-type'] === 'application/octet-stream';
       const ctx = {
         req, res, db,
         params: match.params,
         query: Object.fromEntries(url.searchParams),
-        body: ['POST', 'PUT'].includes(req.method) ? await readJson(req) : {},
+        raw: isRaw ? await readRaw(req, 500 * 1024 * 1024) : null,
+        body: ['POST', 'PUT'].includes(req.method) && !isRaw ? await readJson(req) : {},
         token: cookies[SESSION_COOKIE],
         user: loadUser(db, cookies[SESSION_COOKIE]),
       };

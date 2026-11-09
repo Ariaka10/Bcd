@@ -28,7 +28,7 @@ export class Router {
   }
 }
 
-export async function readJson(req, limit = 10 * 1024 * 1024) {
+export async function readRaw(req, limit) {
   const chunks = [];
   let size = 0;
   for await (const c of req) {
@@ -36,9 +36,14 @@ export async function readJson(req, limit = 10 * 1024 * 1024) {
     if (size > limit) throw new HttpError(413, 'Requête trop volumineuse');
     chunks.push(c);
   }
-  if (!size) return {};
+  return Buffer.concat(chunks);
+}
+
+export async function readJson(req, limit = 10 * 1024 * 1024) {
+  const buf = await readRaw(req, limit);
+  if (!buf.length) return {};
   try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    return JSON.parse(buf.toString('utf8'));
   } catch {
     throw new HttpError(400, 'JSON invalide');
   }

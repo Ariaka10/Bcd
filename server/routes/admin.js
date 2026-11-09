@@ -1,8 +1,66 @@
-import { HttpError, localDate } from '../util.js';
-import { getSettings, DEFAULT_SETTINGS } from '../db.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { HttpError, localDate, randomToken } from '../util.js';
+import { getSettings, DEFAULT_SETTINGS, ensureDefaults } from '../db.js';
 import { staff, admin } from '../guards.js';
+import { snapshot, backupFileName, autoBackup, listBackups, restoreFrom } from '../backup.js';
 
-export default function (r) {
+function tempFile() {
+  return path.join(os.tmpdir(), `bcd-${randomToken().slice(0, 12)}.sqlite`);
+}
+
+export default function (r, { backupDir } = {}) {
+  // Téléchargement d'une copie complète de la base.
+  r.get('/api/admin/backup', admin, ({ db, res }) => {
+    const tmp = snapshot(db, tempFile());
+    res.writeHead(200, {
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': fs.statSync(tmp).size,
+      'Content-Disposition': `attachment; filename="${backupFileName()}"`,
+    });
+    fs.createReadStream(tmp).pipe(res).on('close', () => fs.rmSync(tmp, { force: true }));
+  });
+
+  // Restauration depuis un fichier envoyé par le navigateur.
+  r.post('/api/admin/restore', admin, ({ db, raw }) => {
+    if (!raw?.length) throw new HttpError(400, 'Aucun fichier reçu');
+    const tmp = tempFile();
+    fs.writeFileSync(tmp, raw);
+    try {
+      const info = restoreFrom(db, tmp, { safetyDir: backupDir });
+      ensureDefaults(db);
+      return { ok: true, ...info };
+    } finally {
+      fs.rmSync(tmp, { force: true });
+    }
+  });
+
+  // Sauvegardes automatiques (version bureau).
+  r.get('/api/admin/backups', admin, () => ({ dir: backupDir ?? null, items: listBackups(backupDir) }));
+
+  r.post('/api/admin/backups', admin, ({ db }) => {
+    if (!backupDir) throw new HttpError(400, 'Dossier de sauvegarde non configuré');
+    return { file: path.basename(autoBackup(db, backupDir, { keep: 30, prefix: 'bcd-manuelle' })) };
+  });
+
+  r.post('/api/admin/backups/:name/restore', admin, ({ db, params }) => {
+    if (!backupDir) throw new HttpError(400, 'Dossier de sauvegarde non configuré');
+    const name = path.basename(params.name);
+    const file = path.join(backupDir, name);
+    if (!name.endsWith('.sqlite') || !fs.existsSync(file)) throw new HttpError(404, 'Sauvegarde introuvable');
+    // On restaure depuis une copie : la sauvegarde de sécurité pourrait sinon écraser ce fichier.
+    const tmp = tempFile();
+    fs.copyFileSync(file, tmp);
+    try {
+      const info = restoreFrom(db, tmp, { safetyDir: backupDir });
+      ensureDefaults(db);
+      return { ok: true, ...info };
+    } finally {
+      fs.rmSync(tmp, { force: true });
+    }
+  });
+
   r.get('/api/settings', staff, ({ db }) => getSettings(db));
 
   r.put('/api/settings', admin, ({ db, body }) => {

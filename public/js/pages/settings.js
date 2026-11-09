@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { esc, toast, formData, $, $$ } from '../ui.js';
+import { esc, toast, formData, confirmBox, fmtDate, $, $$ } from '../ui.js';
 import { state, navigate } from '../state.js';
 
 export async function render(app, { path }) {
@@ -27,7 +27,9 @@ export async function render(app, { path }) {
     <div class="card"><h2 style="margin-top:0">Entretien du catalogue</h2>
       <p class="muted">Recalcule la cote de tous les documents selon les règles automatiques (préfixe du genre ou indice Dewey + 3 lettres de l'auteur).
         Attention : les cotes saisies à la main seront remplacées.</p>
-      <button class="btn" id="recompute">🔁 Recalculer toutes les cotes</button></div>`;
+      <button class="btn" id="recompute">🔁 Recalculer toutes les cotes</button></div>
+    <div class="card" id="backups"></div>`;
+  renderBackups();
   $('#f').onsubmit = async (e) => {
     e.preventDefault();
     const data = formData(e.target);
@@ -71,4 +73,59 @@ async function renderAccount(app) {
     e.preventDefault();
     try { await api.put('/me/password', formData(pwd)); toast('Mot de passe changé'); pwd.reset(); } catch (err) { toast(err.message, 'error'); }
   };
+}
+
+/* ---------- Sauvegardes ---------- */
+
+const KINDS = { 'bcd-auto': 'automatique', 'bcd-manuelle': 'manuelle', 'bcd-avant-restauration': 'avant restauration' };
+const kindOf = (name) => KINDS[Object.keys(KINDS).find((k) => name.startsWith(k + '_'))] ?? '';
+const WARN = 'Toutes les données actuelles seront remplacées par celles de la sauvegarde. Une copie de sécurité de l\'état actuel est faite avant.';
+
+function restored(r) {
+  alert(`Restauration terminée : ${r.documents} documents, ${r.users} usagers.\nVeuillez vous reconnecter.`);
+  location.hash = '#/connexion';
+  location.reload();
+}
+
+async function renderBackups() {
+  const box = $('#backups');
+  const { dir, items } = await api.get('/admin/backups');
+  box.innerHTML = `<h2 style="margin-top:0">💾 Sauvegardes</h2>
+    <p class="muted">Toutes les données de la BCD (catalogue, élèves, prêts, listes) tiennent dans un seul fichier.
+      Pensez à en garder une copie sur une clé USB de temps en temps.</p>
+    <div class="row">
+      <a class="btn btn-primary" href="/api/admin/backup" download>⬇️ Enregistrer une sauvegarde…</a>
+      <label class="btn" style="font-weight:500">📂 Restaurer depuis un fichier…
+        <input type="file" id="restore-file" accept=".sqlite,.db" hidden></label>
+      ${dir ? '<button class="btn" id="backup-now">💾 Sauvegarder maintenant</button>' : ''}</div>
+    ${dir ? `<h3>Sauvegardes enregistrées sur cet ordinateur</h3>
+      <p class="small muted">Une sauvegarde est faite automatiquement à chaque fermeture (les 15 dernières sont gardées).<br>
+        Dossier : <code>${esc(dir)}</code></p>
+      ${items.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th class="num">Taille</th><th></th></tr></thead>
+        <tbody>${items.map((b) => `<tr><td>${fmtDate(b.date)} ${new Date(b.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</td>
+          <td>${kindOf(b.name)}</td><td class="num">${(b.size / 1024 / 1024).toFixed(1)} Mo</td>
+          <td class="num"><button class="btn btn-sm restore" data-name="${esc(b.name)}">Restaurer</button></td></tr>`).join('')}</tbody></table></div>`
+        : '<p class="muted">Aucune pour le moment.</p>'}` : ''}`;
+
+  $('#restore-file').onchange = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file || !(await confirmBox(`Restaurer « ${file.name} » ? ${WARN}`, { danger: true, ok: 'Restaurer' }))) return;
+    try {
+      const res = await fetch('/api/admin/restore', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      restored(data);
+    } catch (err) { toast(err.message, 'error'); }
+  };
+  const now = $('#backup-now');
+  if (now) now.onclick = async () => {
+    try { await api.post('/admin/backups'); toast('Sauvegarde enregistrée'); renderBackups(); } catch (err) { toast(err.message, 'error'); }
+  };
+  for (const b of $$('.restore', box)) {
+    b.onclick = async () => {
+      if (!(await confirmBox(`Restaurer la sauvegarde du ${b.closest('tr').cells[0].textContent} ? ${WARN}`, { danger: true, ok: 'Restaurer' }))) return;
+      try { restored(await api.post(`/admin/backups/${encodeURIComponent(b.dataset.name)}/restore`)); } catch (err) { toast(err.message, 'error'); }
+    };
+  }
 }

@@ -149,7 +149,8 @@ td.num, th.num { text-align: right; }
 /* Couvertures */
 .cover { position: relative; width: 48px; aspect-ratio: 2 / 3; border-radius: 4px; overflow: hidden; flex-shrink: 0; background: var(--surface-2); }
 .cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.cover-fallback { position: absolute; inset: 0; display: grid; place-items: center; background: hsl(var(--h) 45% 82%); color: hsl(var(--h) 45% 28%); font-weight: 800; font-size: 1.2rem; }
+.cover-fallback { position: absolute; inset: 0; background: #2f6f5e; }
+.cover-fallback svg { display: block; width: 100%; height: 100%; }
 .cover-lg { width: 160px; }
 .cover-lg .cover-fallback { font-size: 3rem; }
 .cover-md { width: 100%; }
@@ -358,3 +359,12 @@ a.kid-loan { text-decoration: none; color: inherit; }
   .class-sheet a { text-decoration: none; }
 }
 .home-grid { align-items: start; }
+.departed-box { background: var(--warn-soft); margin: 1rem 0; }
+
+/* Aperçu avant impression */
+.modal-print { width: min(1180px, calc(100vw - 2rem)); }
+.modal-print .modal-body { max-height: calc(100vh - 6rem); padding: 0; display: flex; flex-direction: column; }
+.print-toolbar { display: flex; gap: 1rem; align-items: center; padding: .6rem 1rem; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.print-stage { background: #8f8a80; padding: 1.2rem; overflow: auto; flex: 1; min-height: 50vh; text-align: center; }
+.print-sheet { background: #fff; border: 0; box-shadow: 0 4px 18px rgba(0,0,0,.35); display: inline-block; max-width: none; }
+.modal-print .actions { padding: .6rem 1rem; margin: 0; border-top: 1px solid var(--line); }

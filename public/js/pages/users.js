@@ -191,7 +191,7 @@ async function renderUser(app, id) {
   app.innerHTML = `<div class="page-head no-print"><a href="javascript:history.back()" class="btn btn-ghost">← Retour</a>
       <div class="row"><button class="btn" id="edit">✏️ Modifier</button>
       ${u.class_id ? `<a class="btn" href="#/classe/${u.class_id}">🏫 Fiche de la classe</a>` : ''}
-      <button class="btn" onclick="window.print()">🖨️ Imprimer la fiche</button>
+      <button class="btn" onclick="bcdPrint()">🖨️ Imprimer la fiche</button>
       <a class="btn btn-primary" href="#/prets" id="lend">📤 Prêter un livre</a></div></div>
     <p class="print-only small">${esc(state.info.school_name)} — Bibliothèque — fiche du ${new Date().toLocaleDateString('fr-FR')}</p>
     <div class="card"><div class="borrower" style="margin:0"><span class="avatar-lg">${esc(u.avatar)}</span>
@@ -224,26 +224,30 @@ async function renderClassSheet(app, id) {
   const cls = classes.find((c) => c.id === Number(id));
   if (!cls) { app.innerHTML = '<div class="empty">Classe introuvable.</div>'; return; }
   const [students, loans] = await Promise.all([
-    api.get(`/users?class_id=${cls.id}&role=eleve`),
+    api.get(`/users?class_id=${cls.id}&role=eleve&active=all`),
     api.get(`/loans?class_id=${cls.id}&limit=2000`),
   ]);
   const byUser = new Map();
   for (const l of loans) if (l.user_id) (byUser.get(l.user_id) ?? byUser.set(l.user_id, []).get(l.user_id)).push(l);
   const classLoans = loans.filter((l) => !l.user_id);
+  // Élèves partis (archivés) : affichés seulement s'ils ont encore un livre à rendre.
+  const shown = students.filter((u) => u.active || byUser.has(u.id));
+  const activeCount = students.filter((u) => u.active).length;
   const late = loans.filter((l) => l.overdue).length;
   app.innerHTML = `<div class="page-head no-print"><a href="javascript:history.back()" class="btn btn-ghost">← Retour</a>
       <div class="row"><select id="cls" style="width:auto">${classes.map((c) => `<option value="${c.id}" ${c.id === cls.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
         <a class="btn" href="#/cartes?class_id=${cls.id}">🪪 Cartes de connexion</a>
-        <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimer</button></div></div>
+        <button class="btn btn-primary" onclick="bcdPrint()">🖨️ Imprimer</button></div></div>
     <div class="card">
       <h1 style="margin-bottom:.2rem">🏫 ${esc(cls.name)}</h1>
       <p class="muted">${esc(state.info.school_name)}${cls.teacher_name ? ` · ${esc(cls.teacher_name)}` : ''} ·
-        ${plural(students.length, 'élève')} · ${plural(loans.length, 'livre')} en prêt${late ? ` · <b class="text-late">${plural(late, 'retard')}</b>` : ''}
+        ${plural(activeCount, 'élève')} · ${plural(loans.length, 'livre')} en prêt${late ? ` · <b class="text-late">${plural(late, 'retard')}</b>` : ''}
         · le ${new Date().toLocaleDateString('fr-FR')}</p>
       <table class="dense class-sheet"><thead><tr><th>Élève</th><th>Livre(s) empruntés</th><th>N°</th><th>À rendre le</th><th class="print-only">Rendu ✓</th></tr></thead>
-      <tbody>${students.map((u) => {
+      <tbody>${shown.map((u) => {
         const list = byUser.get(u.id) ?? [];
-        const name = `<a href="#/usager/${u.id}">${esc(u.avatar)} <b>${esc(u.first_name)}</b> ${esc(u.last_name)}</a>`;
+        const name = `<a href="#/usager/${u.id}">${esc(u.avatar)} <b>${esc(u.first_name)}</b> ${esc(u.last_name)}</a>`
+          + (u.active ? '' : '<br><span class="badge badge-warn">parti — livre à récupérer</span>');
         if (!list.length) return `<tr><td>${name}</td><td class="muted">—</td><td></td><td></td><td class="print-only"></td></tr>`;
         return list.map((l, i) => `<tr class="${l.overdue ? 'row-late' : ''}">${i === 0 ? `<td rowspan="${list.length}">${name}</td>` : ''}
           <td>${esc(l.title)}</td><td>${esc(l.barcode ?? '')}</td>
@@ -352,6 +356,16 @@ function showReport(r, dry, onConfirm) {
       <div class="stat"><b>${r.archived.length}</b><span>à archiver</span></div>
       <div class="stat"><b>${r.new_classes.length}</b><span>classes créées</span></div></div>
     ${r.errors.length ? section('⚠️ Problèmes', r.errors, 'err') : ''}
+    ${r.archived_with_loans?.length ? `<div class="card departed-box">
+      <h3 style="margin-top:0">🎒 ${plural(r.archived_with_loans.length, 'élève qui part', 'élèves qui partent')} avec un livre</h3>
+      <p class="small">Si le livre est déjà revenu, cliquez sur « Rendu ». S'il est perdu, sur « Perdu ».
+        Sinon, ne faites rien : le prêt est conservé et vous le retrouverez dans <b>Prêts → Élèves partis</b>
+        (avec un mot pour la famille à imprimer).</p>
+      <ul class="log">${r.archived_with_loans.flatMap((u) => u.loans.map((l) => `<li data-loan="${l.id}">
+        <b>${esc(u.name)}</b> <span class="muted small">${esc(u.class_name ?? '')}</span> — ${esc(l.title)}
+        <span class="muted small">n° ${esc(l.barcode ?? '')}</span>
+        <span class="loan-actions" style="float:right"><button class="btn btn-sm dep-act" data-act="return" data-id="${l.id}">✅ Rendu</button>
+          <button class="btn btn-sm dep-act" data-act="lost" data-id="${l.id}">❓ Perdu</button></span></li>`)).join('')}</ul></div>` : ''}
     ${section('Classes créées', r.new_classes)}
     ${section('Nouveaux élèves', r.created, 'ok')}
     ${section('Changements de classe', r.moved, 'warn')}
@@ -361,6 +375,15 @@ function showReport(r, dry, onConfirm) {
         <a class="btn" href="#/usagers">Voir les usagers</a><a class="btn btn-primary" href="#/cartes">🪪 Imprimer les cartes de connexion</a></div>`}
   </div>`;
   if (dry) $('#go').onclick = onConfirm;
+  for (const b of $$('.dep-act')) {
+    b.onclick = async () => {
+      const lost = b.dataset.act === 'lost';
+      try {
+        await api.post('/loans/return', { loan_id: Number(b.dataset.id), lost });
+        b.closest('.loan-actions').innerHTML = lost ? '<span class="badge badge-late">déclaré perdu</span>' : '<span class="badge badge-ok">rendu</span>';
+      } catch (e) { toast(e.message, 'error'); }
+    };
+  }
 }
 
 /* ---------- Cartes de connexion à imprimer ---------- */
@@ -373,7 +396,7 @@ async function renderCards(app, query) {
   const cls = classes.find((c) => String(c.id) === String(classId));
   app.innerHTML = `<div class="page-head no-print"><h1>Cartes de connexion</h1>
       <div class="row"><select id="cls" style="width:auto">${classes.map((c) => `<option value="${c.id}" ${String(c.id) === String(classId) ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
-      <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimer</button></div></div>
+      <button class="btn btn-primary" onclick="bcdPrint()">🖨️ Imprimer</button></div></div>
     ${tabs('cards')}
     <p class="muted no-print">Chaque élève choisit sa classe, touche son avatar puis, s'il en a un, tape son code secret. Découpez et distribuez les cartes.</p>
     ${full.length ? `<div class="cards-print">${full.map((u) => `<div class="login-card">

@@ -17,6 +17,8 @@ export async function render(app) {
         <a class="btn" href="/api/admin/backup" download>⬇️ Enregistrer une copie (clé USB…)</a></div></div>
 
     <div class="card step"><h2>2. Les livres pas encore rendus</h2>
+      ${r.departed_loans ? `<p class="badge badge-warn">🎒 ${plural(r.departed_loans, 'livre')} chez des élèves déjà partis :
+        <a href="#/prets?vue=partis">voir la liste et les mots pour les familles</a></p>` : ''}
       ${r.pending_loans ? `<p>Il reste <b>${plural(r.pending_loans, 'livre')}</b> en prêt de l'an dernier.
         Les élèves qui partent gardent leur prêt en cours tant qu'il n'est pas rendu (ils ne seront pas supprimés).</p>
         <div class="row"><a class="btn" href="#/prets?vue=fin">📋 Voir la liste par classe</a></div>`
@@ -26,6 +28,8 @@ export async function render(app) {
       <p class="muted">Exportez la liste depuis ONDE puis importez-la avec l'option « Archiver les élèves absents du fichier » :
         les élèves qui restent changent de classe, les nouveaux sont ajoutés, ceux qui sont partis sont archivés.
         (${plural(r.students, 'élève actif', 'élèves actifs')} aujourd'hui.)</p>
+      <p class="small muted">Les élèves qui partent avec un livre sont signalés dans l'aperçu de l'import : vous pouvez noter le retour
+        ou la perte tout de suite, ou garder le prêt (rubrique Prêts → Élèves partis).</p>
       <div class="row"><a class="btn btn-primary" href="#/import?rentree=1">📥 Importer depuis ONDE</a></div></div>
 
     <div class="card step"><h2>4. Supprimer les élèves partis</h2>

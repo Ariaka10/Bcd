@@ -168,6 +168,8 @@ export default function (r, { backupDir, appInfo, installUpdate, checkUpdate, ch
       year,
       done: getSettings(db).school_year_done === year,
       pending_loans: db.prepare('SELECT COUNT(*) AS n FROM loans WHERE returned_at IS NULL').get().n,
+      departed_loans: db.prepare(`SELECT COUNT(*) AS n FROM loans l JOIN users u ON u.id = l.user_id
+        WHERE l.returned_at IS NULL AND u.active = 0`).get().n,
       students: db.prepare(`SELECT COUNT(*) AS n FROM users WHERE role = 'eleve' AND active = 1`).get().n,
       archived: db.prepare(`SELECT u.id, u.first_name, u.last_name, u.archived_at, c.name AS class_name,
           (SELECT COUNT(*) FROM loans l WHERE l.user_id = u.id AND l.returned_at IS NULL) AS active_loans
@@ -176,6 +178,7 @@ export default function (r, { backupDir, appInfo, installUpdate, checkUpdate, ch
       empty_classes: db.prepare(`SELECT c.id, c.name FROM classes c
         WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.class_id = c.id AND u.active = 1)
           AND NOT EXISTS (SELECT 1 FROM loans l WHERE l.class_id = c.id AND l.returned_at IS NULL)
+          AND NOT EXISTS (SELECT 1 FROM loans l JOIN users u ON u.id = l.user_id WHERE u.class_id = c.id AND l.returned_at IS NULL)
         ORDER BY c.name`).all(),
     };
   });
@@ -199,7 +202,8 @@ export default function (r, { backupDir, appInfo, installUpdate, checkUpdate, ch
   r.post('/api/admin/rentree/classes', admin, ({ db, body }) => {
     const del = db.prepare(`DELETE FROM classes WHERE id = ?
       AND NOT EXISTS (SELECT 1 FROM users u WHERE u.class_id = classes.id AND u.active = 1)
-      AND NOT EXISTS (SELECT 1 FROM loans l WHERE l.class_id = classes.id AND l.returned_at IS NULL)`);
+      AND NOT EXISTS (SELECT 1 FROM loans l WHERE l.class_id = classes.id AND l.returned_at IS NULL)
+      AND NOT EXISTS (SELECT 1 FROM loans l JOIN users u ON u.id = l.user_id WHERE u.class_id = classes.id AND l.returned_at IS NULL)`);
     let n = 0;
     for (const id of body.ids ?? []) n += Number(del.run(Number(id)).changes);
     return { deleted: n };
@@ -244,6 +248,8 @@ export default function (r, { backupDir, appInfo, installUpdate, checkUpdate, ch
           WHERE coalesce(l.class_id, u.class_id) = c.id AND l.loaned_at >= ?) AS n
         FROM classes c ORDER BY c.name`).all(schoolYearStart),
       reservations: one(`SELECT COUNT(*) AS n FROM reservations WHERE status = 'prete'`),
+      departed_loans: one(`SELECT COUNT(*) AS n FROM loans l JOIN users u ON u.id = l.user_id
+        WHERE l.returned_at IS NULL AND u.active = 0`),
       recent: db.prepare(`SELECT id, title, cote, cover_url FROM documents ORDER BY created_at DESC, id DESC LIMIT 8`).all(),
     };
   });

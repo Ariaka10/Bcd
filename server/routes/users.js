@@ -69,7 +69,7 @@ function findOrCreateClass(db, name, level) {
  */
 export function importStudents(db, { text, class_name, dry_run, archive_missing }) {
   const { students, errors, columns } = parseStudentList(text, { defaultClass: class_name });
-  const report = { columns, errors, created: [], moved: [], unchanged: 0, reactivated: 0, archived: [], new_classes: [] };
+  const report = { columns, errors, created: [], moved: [], unchanged: 0, reactivated: 0, archived: [], archived_with_loans: [], new_classes: [] };
   if (!students.length) return report;
 
   const run = () => {
@@ -116,6 +116,13 @@ export function importStudents(db, { text, class_name, dry_run, archive_missing 
         LEFT JOIN classes c ON c.id = u.class_id WHERE u.role = 'eleve' AND u.active = 1`).all()) {
         if (seen.has(u.id)) continue;
         report.archived.push(`${u.first_name} ${u.last_name}${u.class_name ? ` (${u.class_name})` : ''}`);
+        // Élève qui part avec un livre : signalé pour le récupérer (le prêt est conservé).
+        const loans = db.prepare(`SELECT l.id, l.due_at, coalesce(d.title, l.doc_title) AS title, c.barcode FROM loans l
+          LEFT JOIN documents d ON d.id = l.document_id LEFT JOIN copies c ON c.id = l.copy_id
+          WHERE l.user_id = ? AND l.returned_at IS NULL ORDER BY l.due_at`).all(u.id);
+        if (loans.length) {
+          report.archived_with_loans.push({ id: u.id, name: `${u.first_name} ${u.last_name}`, class_name: u.class_name, loans });
+        }
         if (!dry_run) db.prepare('UPDATE users SET active = 0 WHERE id = ?').run(u.id);
       }
     }

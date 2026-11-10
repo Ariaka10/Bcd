@@ -27,6 +27,7 @@ export async function render(app) {
       <a class="stat" href="#/catalogue"><b>${s.documents}</b><span>documents (${s.copies} exemplaires)</span></a>
       <a class="stat" href="#/prets"><b>${s.active_loans}</b><span>prêts en cours</span></a>
       <a class="stat ${s.overdue ? 'stat-alert' : ''}" href="#/retards"><b>${s.overdue}</b><span>retards</span></a>
+      ${s.departed_loans ? `<a class="stat stat-warn" href="#/prets?vue=partis"><b>${s.departed_loans}</b><span>livre(s) chez des élèves partis</span></a>` : ''}
       ${s.reservations ? `<a class="stat stat-warn" href="#/prets?vue=reservations"><b>${s.reservations}</b><span>livre(s) réservé(s) à remettre</span></a>` : ''}
       <a class="stat" href="#/usagers"><b>${s.students}</b><span>élèves · ${s.classes} classes</span></a>
       <div class="stat"><b>${s.loans_this_year}</b><span>prêts depuis la rentrée</span></div>

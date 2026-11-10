@@ -424,7 +424,7 @@ export default function (r, deps) {
     const state = body.state ?? c.state;
     if (!COPY_STATES.includes(state)) throw new HttpError(400, 'État inconnu');
     const barcode = String(body.barcode ?? c.barcode).trim();
-    if (!barcode) throw new HttpError(400, 'Code-barres requis');
+    if (!barcode) throw new HttpError(400, 'Numéro requis');
     db.prepare('UPDATE copies SET state = ?, barcode = ?, notes = ? WHERE id = ?')
       .run(state, barcode, body.notes ?? c.notes, c.id);
     return { ok: true };

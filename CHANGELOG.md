@@ -2,6 +2,28 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
+## [1.3.2] — 2026-11-11
+
+### Ajouté
+- **Vignette des livres sans image** : l'icône de l'application (livre ouvert) avec la première lettre du titre
+  sur la page de gauche (« Le loup… » → « L » de loup).
+- Cote des documentaires : les saisons et la nature sont reconnues (indice Dewey 508).
+- **Aperçu avant impression** : chaque bouton « Imprimer » (et Ctrl+P) ouvre d'abord une fenêtre montrant la feuille
+  telle qu'elle sortira (A4, portrait ou paysage), avec le bouton « Imprimer » en bas.
+- **Import ONDE : élèves qui partent avec un livre** signalés dans l'aperçu, avec des boutons « Rendu » / « Perdu »
+  pour régler le prêt tout de suite (sinon le prêt est conservé).
+- Onglet **Prêts → Élèves partis** : les livres encore chez des élèves archivés, avec les mots pour les familles
+  à imprimer. Rappel sur l'accueil et dans l'assistant de rentrée.
+
+### Corrigé
+- **Réservations d'un élève parti** : quand un élève est archivé ou supprimé, ses réservations sont annulées
+  et un livre qui lui était mis de côté passe à l'enfant suivant (avant, le livre restait bloqué).
+- **Assistant de rentrée** : une classe n'est plus proposée à la suppression tant que des élèves partis
+  de cette classe ont encore un livre.
+- **Fiche classe** : un élève parti (archivé, par exemple après l'import ONDE de la rentrée) qui a encore
+  un livre n'était pas affiché, alors que son livre était compté dans le total. Il apparaît maintenant
+  avec la mention « parti — livre à récupérer ». Même mention dans les listes de prêts, retards et fin d'année.
+
 ## [1.3.1] — 2026-11-11
 
 ### Ajouté

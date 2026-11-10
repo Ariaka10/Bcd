@@ -15,6 +15,7 @@ export async function render(app, { path, query }) {
       <a href="#/retards" class="${tab === 'late' ? 'active' : ''}">⏰ Retards</a>
       <a href="#/prets?vue=reservations" class="${tab === 'reservations' ? 'active' : ''}">🔖 Réservations</a>
       <a href="#/prets?vue=fin" class="${tab === 'fin' ? 'active' : ''}">☀️ Fin d'année</a>
+      <a href="#/prets?vue=partis" class="${tab === 'partis' ? 'active' : ''}">🎒 Élèves partis</a>
       <a href="#/prets?vue=history" class="${tab === 'history' ? 'active' : ''}">🕓 Historique</a></div>
     <div id="tab"></div>`;
   const el = $('#tab');
@@ -22,6 +23,7 @@ export async function render(app, { path, query }) {
   if (tab === 'late') return overdue(el, query);
   if (tab === 'reservations') return reservations(el);
   if (tab === 'fin') return endOfYear(el, query);
+  if (tab === 'partis') return departed(el, query);
   return loanTable(el, query, tab);
 }
 
@@ -242,11 +244,11 @@ async function loanTable(el, query, tab) {
       <select id="class-filter" style="width:auto"><option value="">Toutes les classes</option>
         ${classes.map((c) => `<option value="${c.id}" ${String(query.class_id) === String(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
       <span class="muted">${plural(loans.length, 'prêt')}</span><span class="grow"></span>
-      <button class="btn" onclick="window.print()">🖨️ Imprimer</button></div>
+      <button class="btn" onclick="bcdPrint()">🖨️ Imprimer</button></div>
     ${loans.length ? `<div class="table-wrap"><table><thead><tr><th>Emprunteur</th><th>Classe</th><th>Document</th><th>N°</th>
       <th>Prêté le</th><th>${tab === 'history' ? 'Rendu le' : 'À rendre le'}</th>${tab === 'history' ? '' : '<th class="no-print"></th>'}</tr></thead>
       <tbody>${loans.map((l) => `<tr>
-        <td>${l.user_id ? `<a href="#/usager/${l.user_id}">${esc(l.avatar)} ${esc(l.first_name)} ${esc(l.last_name)}</a>` : `📦 <b>Toute la classe</b>`}</td>
+        <td>${l.user_id ? `<a href="#/usager/${l.user_id}">${esc(l.avatar)} ${esc(l.first_name)} ${esc(l.last_name)}</a>${l.user_active ? '' : ' <span class="badge badge-warn">parti</span>'}` : `📦 <b>Toute la classe</b>`}</td>
         <td>${esc(l.class_name ?? '')}</td>
         <td>${l.document_id ? `<a href="#/document/${l.document_id}">${esc(l.title)}</a>` : esc(l.title)} <span class="cote small">${esc(l.cote ?? '')}</span></td>
         <td class="small">${esc(l.barcode ?? '')}</td>
@@ -295,7 +297,9 @@ function groupByClass(loans) {
   return byClass;
 }
 
-const who = (l) => (l.user_id ? `${esc(l.avatar)} ${esc(l.first_name)} ${esc(l.last_name)}` : '📦 <b>Toute la classe</b>');
+const who = (l) => (l.user_id
+  ? `${esc(l.avatar)} ${esc(l.first_name)} ${esc(l.last_name)}${l.user_active ? '' : ' <span class="badge badge-warn">parti</span>'}`
+  : '📦 <b>Toute la classe</b>');
 
 async function overdue(el, query) {
   const loans = await api.get('/loans' + qs({ status: 'overdue' }));
@@ -304,7 +308,7 @@ async function overdue(el, query) {
       <span class="muted">${plural(loans.length, 'livre')} en retard</span><span class="grow"></span>
       <a class="btn" href="#/retards${mode === 'slips' ? '' : '?mode=slips'}">${mode === 'slips' ? '📋 Vue tableau' : '✉️ Mots pour les familles'}</a>
       <a class="btn" href="/api/loans/overdue.csv" download>⬇️ CSV</a>
-      <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimer</button></div>
+      <button class="btn btn-primary" onclick="bcdPrint()">🖨️ Imprimer</button></div>
     ${!loans.length ? '<div class="empty">🎉 Aucun retard !</div>' : mode === 'slips' ? slips(loans.filter((l) => l.user_id)) : [...groupByClass(loans)].map(([cls, list]) => `
       <div class="card" style="break-inside:avoid"><h2 style="margin-top:0">${esc(cls)} <span class="muted small">(${list.length})</span></h2>
       <div class="table-wrap"><table><thead><tr><th>Emprunteur</th><th>Document</th><th>N°</th><th>À rendre le</th><th class="num">Retard</th><th class="no-print"></th></tr></thead>
@@ -371,7 +375,7 @@ async function endOfYear(el, query) {
         <label>Classe <select name="class_id" style="width:auto"><option value="">Toutes</option>
           ${classes.map((c) => `<option value="${c.id}" ${String(query.class_id) === String(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
         <button type="button" class="btn" id="apply">📅 Fixer cette date de retour pour ces ${loans.length} prêts</button>
-        <button type="button" class="btn btn-primary" onclick="window.print()">🖨️ Imprimer les listes par classe</button></form></div>
+        <button type="button" class="btn btn-primary" onclick="bcdPrint()">🖨️ Imprimer les listes par classe</button></form></div>
     ${!loans.length ? '<div class="empty">🎉 Tous les livres sont rentrés !</div>' : [...groupByClass(loans)].map(([cls, list]) => `
       <div class="card print-page"><h2 style="margin-top:0">${esc(cls)} — livres à rendre avant le ${fmtDate(deadline)}</h2>
         <p class="muted small">${esc(state.info.school_name)} · ${plural(list.length, 'livre')}</p>
@@ -385,4 +389,25 @@ async function endOfYear(el, query) {
     toast(`${plural(r.updated, 'prêt')} mis à jour`);
     navigate(location.hash);
   };
+}
+
+/* ---------- Élèves partis avec un livre ---------- */
+
+async function departed(el, query) {
+  const loans = await api.get('/loans' + qs({ departed: '1' }));
+  const mode = query.mode ?? 'table';
+  el.innerHTML = `<p class="muted no-print">Élèves archivés (partis de l'école, par exemple après l'import ONDE de la rentrée)
+      qui ont encore un livre. Ils pourront être supprimés dans l'assistant de rentrée une fois le livre rendu ou déclaré perdu.</p>
+    <div class="row no-print" style="margin-bottom:.8rem">
+      <span class="muted">${plural(loans.length, 'livre')} à récupérer</span><span class="grow"></span>
+      ${loans.length ? `<a class="btn" href="#/prets?vue=partis${mode === 'slips' ? '' : '&mode=slips'}">${mode === 'slips' ? '📋 Vue tableau' : '✉️ Mots pour les familles'}</a>
+      <button class="btn btn-primary" onclick="bcdPrint()">🖨️ Imprimer</button>` : ''}</div>
+    ${!loans.length ? '<div class="empty">🎉 Aucun livre chez un élève parti.</div>' : mode === 'slips' ? slips(loans)
+      : `<div class="table-wrap"><table><thead><tr><th>Élève</th><th>Ancienne classe</th><th>Livre</th><th>N°</th><th>À rendre le</th><th class="no-print"></th></tr></thead>
+        <tbody>${loans.map((l) => `<tr><td><a href="#/usager/${l.user_id}">${esc(l.avatar)} ${esc(l.first_name)} ${esc(l.last_name)}</a></td>
+          <td>${esc(l.class_name ?? '')}</td><td>${esc(l.title)}</td><td>${esc(l.barcode ?? '')}</td>
+          <td class="nowrap">${fmtDate(l.due_at)}${l.overdue ? ` <span class="badge badge-late">+${l.days_late} j</span>` : ''}</td>
+          <td class="no-print nowrap"><button class="btn btn-sm act" data-act="return" data-id="${l.id}">✅ Rendu</button>
+            <button class="btn btn-sm act" data-act="lost" data-id="${l.id}">❓ Perdu</button></td></tr>`).join('')}</tbody></table></div>`}`;
+  bindLoanActions(el);
 }

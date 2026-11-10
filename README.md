@@ -17,7 +17,7 @@ Gratuite, en français, sans abonnement, et les données restent sur l'ordinateu
 | 📚 **Catalogue** | Ajout d'un livre en tapant son ISBN : la fiche arrive de la **BnF**. Cote calculée automatiquement, numéro d'exemplaire simple (1, 2, 3…), couverture, thèmes, mots-clés. |
 | 🛎️ **Prêts** | Comptoir **sans douchette** : on touche l'avatar de l'enfant, on tape le numéro ou le titre du livre. Retards, réservations, prêt à toute une classe, fin d'année. |
 | 🧒 **Élèves** | Import depuis **ONDE**, connexion par **avatar** (sans mot de passe), thèmes en gros boutons, avis en frimousses 😍🙂😐. |
-| 💾 **Sécurité** | Sauvegarde toutes les 30 minutes et à chaque fermeture, copie sur **clé USB**, assistant de rentrée. Rien n'est envoyé sur Internet (sauf l'ISBN pour trouver la notice). |
+| 💾 **Sécurité** | Sauvegarde toutes les 30 minutes et à chaque fermeture, copie sur **clé USB**, assistant de rentrée. **Aucune donnée d'élève ne quitte l'ordinateur.** |
 | 🪟 **Windows** | Un installateur, ou un **zip sans installation** pour les PC qui bloquent les installations. Rien d'autre à installer. |
 
 ## 📥 Télécharger et installer
@@ -72,11 +72,13 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
 - **Prêt à toute une classe** (lot de livres), **réservations** (par un adulte ou « Je le veux ! » de l'élève),
   livre mis de côté au retour.
 - **Retards** par classe et **mots aux familles** imprimables ; **fin d'année** : listes par classe et date de retour commune.
+- **Élèves partis avec un livre** : signalés à l'import ONDE (« Rendu » / « Perdu »), rubrique dédiée avec mots pour les familles.
 - Durées et limites par profil, prolongations, déclaration de perte.
 
 ### Élèves et classes
 - **Import ONDE** (ou CSV) avec aperçu : nouvelles classes, changements de classe, élèves partis archivés.
 - **Fiche classe** et **fiche élève** imprimables, avec le **carnet de lecteur** de l'année.
+- **Aperçu avant impression** (A4, portrait ou paysage) pour toutes les impressions.
 - Connexion des élèves **sans mot de passe** : classe → avatar → code secret en pictogrammes (facultatif) ;
   **cartes de connexion** imprimables.
 - Espace élève pensé pour la maternelle : thèmes en gros boutons, couvertures, « Mes livres »,
@@ -85,6 +87,8 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
 
 ### Sécurité des données
 - Les données restent **sur l'ordinateur** (`Documents\BCD`), rien n'est ouvert sur le réseau.
+  Internet ne sert qu'à chercher les notices par ISBN (BnF, Open Library, Google Books), afficher les couvertures
+  et vérifier les mises à jour : aucune donnée d'élève n'est envoyée.
 - **Sauvegarde automatique** toutes les 30 minutes pendant l'utilisation et à chaque fermeture, **copie sur clé USB**,
   restauration en un clic. Chaque modification est enregistrée immédiatement : une coupure de courant ne fait pas perdre la journée.
 - **Assistant de rentrée** : suppression des données des élèves partis (RGPD).

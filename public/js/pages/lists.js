@@ -66,7 +66,7 @@ async function renderList(app, id, query) {
         <a class="btn" href="#/catalogue${qs({ list_id: l.id })}" title="Ouvrir dans le catalogue">🔎 Catalogue</a>
         <button class="btn" id="labels">🏷️ Étiquettes</button>
         <a class="btn" href="/api/lists/${l.id}/export.csv" download>⬇️ CSV</a>
-        <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimer</button>
+        <button class="btn btn-primary" onclick="bcdPrint()">🖨️ Imprimer</button>
         <button class="btn btn-danger" id="del">🗑️</button></div></div>
     <div class="card">
       <h1>${esc(l.name)}</h1>
@@ -101,7 +101,7 @@ async function renderLabels(app) {
   const labels = detail.flatMap((d) => (d.copies.length ? d.copies : [{ barcode: '' }]).map((c) => ({ ...d, barcode: c.barcode })));
   app.innerHTML = `<div class="page-head no-print"><div><h1>Étiquettes</h1>
       <p class="muted">${plural(labels.length, 'étiquette')} (une par exemplaire). À imprimer sur planche d'étiquettes ou papier, puis découper.</p></div>
-      <div class="row"><a href="javascript:history.back()" class="btn btn-ghost">← Retour</a><button class="btn btn-primary" onclick="window.print()">🖨️ Imprimer</button></div></div>
+      <div class="row"><a href="javascript:history.back()" class="btn btn-ghost">← Retour</a><button class="btn btn-primary" onclick="bcdPrint()">🖨️ Imprimer</button></div></div>
     <div class="labels-print">${labels.map((d) => `<div class="label"><b>${esc(d.cote ?? '')}</b>
       <small>${esc(d.title)}</small><small>${d.barcode ? `n° ${esc(d.barcode)}` : ""}</small></div>`).join('')}</div>`;
 }

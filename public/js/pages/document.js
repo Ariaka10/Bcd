@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { esc, cover, toast, modal, confirmBox, formData, fmtDate, plural, $, $$, debounce } from '../ui.js';
+import { esc, cover, toast, modal, confirmBox, formData, fmtDate, plural, $, $$, debounce, resizeImage, pickImage, uploadCover } from '../ui.js';
 import { state, navigate, isAdmin, typeLabel, loadThemes, themeChips } from '../state.js';
 import { addToListDialog } from './catalogue.js';
 
@@ -38,7 +38,10 @@ function renderDetail(app, d) {
         <a class="btn" href="#/document/${d.id}/modifier">✏️ Modifier</a>
         ${isAdmin() ? '<button class="btn btn-danger" id="del">🗑️ Supprimer</button>' : ''}</div></div>
     <div class="card doc-detail">
-      <div>${cover(d, 'cover-lg')}</div>
+      <div>${cover(d, 'cover-lg')}
+        <div class="cover-actions no-print">
+          <button class="btn btn-sm" id="set-cover">📷 ${d.cover_url ? 'Changer la couverture' : 'Ajouter une couverture'}</button>
+          ${d.cover_url ? '<button class="btn btn-sm btn-ghost" id="rm-cover">Retirer l\'image</button>' : ''}</div></div>
       <div>
         <h1>${esc(d.title)}</h1>
         ${d.subtitle ? `<p class="muted" style="margin:0">${esc(d.subtitle)}</p>` : ''}
@@ -75,6 +78,21 @@ function renderDetail(app, d) {
 
   $('#to-list').onclick = () => addToListDialog([d.id]);
   $('#reserve').onclick = () => reserveDialog(d);
+  $('#set-cover').onclick = async () => {
+    const file = await pickImage();
+    if (!file) return;
+    try {
+      await uploadCover(d.id, await resizeImage(file));
+      toast('Couverture enregistrée');
+      navigate(location.hash);
+    } catch (e) { toast(e.message, 'error'); }
+  };
+  if ($('#rm-cover')) $('#rm-cover').onclick = async () => {
+    if (!(await confirmBox('Retirer l\'image de couverture de ce livre ?'))) return;
+    await api.del(`/documents/${d.id}/cover`);
+    if (d.cover_url && !d.cover_url.startsWith('/api/')) await api.put(`/documents/${d.id}`, { cover_url: '' });
+    navigate(location.hash);
+  };
   for (const b of $$('.cancel-res')) {
     b.onclick = async () => {
       const r = await api.del(`/reservations/${b.dataset.id}`);
@@ -224,7 +242,13 @@ function renderForm(app, doc) {
         ${field('location', 'Emplacement', 'placeholder="Bac albums, étagère 3…"')}
         ${field('isbn', 'ISBN / EAN')}
         <label class="span-all">Résumé<textarea name="summary" rows="3">${esc(d.summary ?? '')}</textarea></label>
-        <label class="span-2">Image de couverture (adresse web)<input name="cover_url" value="${esc(d.cover_url ?? '')}"></label>
+        <div class="span-2 cover-box"><div id="cover-preview">${cover(d, 'cover-md')}</div>
+          <div><b>Couverture</b>
+            <div class="row" style="margin:.4rem 0"><button type="button" class="btn btn-sm" id="pick-cover">📷 Choisir une image ou une photo</button>
+              <button type="button" class="btn btn-sm btn-ghost" id="clear-cover">✕ Aucune</button></div>
+            <p class="muted small" style="margin:0">Astuce : une image copiée (clic droit → « Copier l'image ») se colle ici avec Ctrl+V.</p>
+            <details style="margin-top:.4rem"><summary class="small">Adresse web de l'image</summary>
+              <input name="cover_url" value="${esc(d.cover_url ?? '')}" style="margin-top:.3rem"></details></div></div>
         <label class="span-2">Notes internes<input name="notes" value="${esc(d.notes ?? '')}"></label>
         ${doc ? '' : `<label>Nombre d'exemplaires<input name="copies" type="number" min="0" max="50" value="1"></label>
         <p class="span-2 muted small" style="align-self:end">Chaque exemplaire reçoit un numéro (1, 2, 3…) à écrire sur le livre.</p>`}
@@ -237,6 +261,23 @@ function renderForm(app, doc) {
     </form>`;
 
   const form = $('#doc-form');
+
+  // Couverture choisie dans le formulaire : envoyée juste après l'enregistrement du livre.
+  let pendingCover = null;
+  const showCover = (url) => { $('#cover-preview').innerHTML = cover({ title: form.title.value || '?', cover_url: url }, 'cover-md'); };
+  const setPending = async (file) => {
+    try {
+      pendingCover = await resizeImage(file);
+      showCover(URL.createObjectURL(pendingCover));
+    } catch (e) { toast(e.message, 'error'); }
+  };
+  $('#pick-cover').onclick = async () => { const f = await pickImage(); if (f) setPending(f); };
+  $('#clear-cover').onclick = () => { pendingCover = null; form.cover_url.value = ''; showCover(null); };
+  form.cover_url.addEventListener('change', () => { pendingCover = null; showCover(form.cover_url.value); });
+  form.addEventListener('paste', (e) => {
+    const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith('image/'));
+    if (file) { e.preventDefault(); setPending(file); }
+  });
   let coteTouched = Boolean(doc?.cote);
   const recompute = async (force) => {
     if (coteTouched && !force) return;
@@ -255,6 +296,7 @@ function renderForm(app, doc) {
     for (const [k, v] of Object.entries(n)) {
       if (form[k] && v !== null && v !== undefined && form[k].type !== 'checkbox') form[k].value = v;
     }
+    if (!pendingCover) showCover(form.cover_url.value);
     coteTouched = false;
   };
 
@@ -306,10 +348,12 @@ function renderForm(app, doc) {
     try {
       if (doc) {
         await api.put(`/documents/${doc.id}`, data);
+        if (pendingCover) await uploadCover(doc.id, pendingCover);
         toast('Notice enregistrée');
         navigate(`#/document/${doc.id}`);
       } else {
         const r = await api.post('/documents', data);
+        if (pendingCover) await uploadCover(r.id, pendingCover).catch((e) => toast(e.message, 'error'));
         toast(`Ajouté — cote ${r.cote}${r.barcodes.length ? ` · n° ${r.barcodes.join(', ')} (à écrire sur le livre)` : ''}`);
         navigate(again ? '#/document/nouveau' : `#/document/${r.id}`);
       }

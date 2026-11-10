@@ -102,3 +102,48 @@ export function debounce(fn, ms = 250) {
   let t;
   return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
 }
+
+/** Réduit une image (photo de téléphone…) à `max` pixels de côté, en JPEG : quelques dizaines de Ko. */
+export async function resizeImage(file, max = 800) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('Image illisible'));
+      i.src = url;
+    });
+    const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** Ouvre le sélecteur de fichier (ou l'appareil photo sur tablette / téléphone) pour une image. */
+export function pickImage() {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = () => resolve(input.files[0] ?? null);
+    input.click();
+  });
+}
+
+/** Envoie une couverture pour un document. */
+export async function uploadCover(docId, blob) {
+  const res = await fetch(`/api/documents/${docId}/cover`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: blob,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? 'Envoi impossible');
+  return data;
+}

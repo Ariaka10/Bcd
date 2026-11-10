@@ -1,6 +1,6 @@
 /** Catalogue : recherche, « Tous les livres » (inventaire complet) et gestion des thèmes. */
 import { api, qs } from '../api.js';
-import { esc, cover, toast, modal, confirmBox, formData, plural, $, $$ } from '../ui.js';
+import { esc, cover, toast, modal, confirmBox, formData, plural, readTextFile, $, $$ } from '../ui.js';
 import { state, navigate, isAdmin, typeLabel, loadThemes, themeChips } from '../state.js';
 
 const selected = new Set();
@@ -12,6 +12,7 @@ export async function render(app, { path, query }) {
   await loadThemes();
   if (path === '/themes') return renderThemes(app);
   if (path === '/inventaire') return renderInventory(app, query);
+  if (path === '/import-livres') return renderImport(app);
   return renderSearch(app, query);
 }
 
@@ -20,7 +21,8 @@ export function tabs(active) {
     <a href="#/catalogue" class="${active === 'search' ? 'active' : ''}">🔎 Recherche</a>
     <a href="#/inventaire" class="${active === 'all' ? 'active' : ''}">📚 Tous les livres</a>
     <a href="#/themes" class="${active === 'themes' ? 'active' : ''}">🏷️ Thèmes</a>
-    ${isAdmin() ? `<a href="#/desherbage" class="${active === 'weeding' ? 'active' : ''}">🌿 Désherbage</a>` : ''}</div>`;
+    ${isAdmin() ? `<a href="#/desherbage" class="${active === 'weeding' ? 'active' : ''}">🌿 Désherbage</a>
+      <a href="#/import-livres" class="${active === 'import' ? 'active' : ''}">📥 Importer</a>` : ''}</div>`;
 }
 
 const themeOptions = (current) => `<option value="">Tous</option>
@@ -325,6 +327,91 @@ function editTheme(t = { emoji: '⭐', color: COLORS[0], for_students: 1 }) {
       navigate(location.hash);
     } catch (err) { toast(err.message, 'error'); }
   };
+}
+
+/* ---------- Import d'un catalogue existant ---------- */
+
+async function renderImport(app) {
+  const types = Object.entries(state.meta.doc_types);
+  app.innerHTML = `
+    <div class="page-head"><div><h1>Importer des livres</h1>
+      <p class="muted">Reprenez le catalogue d'un autre logiciel (Hibouthèque, BCDI, PMB…) ou d'un tableau Excel.</p></div></div>
+    ${tabs('import')}
+    <div class="card">
+      <h2 style="margin-top:0">Depuis Hibouthèque</h2>
+      <ol class="small">
+        <li>Connectez-vous à Hibouthèque en <b>administrateur</b>.</li>
+        <li>Onglet <b>Administration</b> → <b>Document</b>, puis en bas de la liste d'actions : <b>Export des documents en CSV</b>.</li>
+        <li>Enregistrez le fichier, puis choisissez-le ci-dessous.</li></ol>
+      <p class="small muted">Tout fichier <b>CSV</b> (séparateur « ; » ou « , ») ou <b>XML</b> convient. Depuis Excel : « Enregistrer sous » → « CSV (séparateur : point-virgule) ».
+        Une ligne par livre ou par exemplaire : les exemplaires d'un même livre (même ISBN, ou même titre et auteur) sont regroupés.
+        Les livres déjà présents dans la BCD sont ignorés : on peut relancer l'import sans créer de doublons.</p>
+      <label>Fichier<input type="file" id="file" accept=".csv,.txt,.xml,text/csv,text/xml"></label>
+    </div>
+    <div id="step2"></div>`;
+
+  $('#file').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const text = await readTextFile(file);
+    let a;
+    try { a = await api.post('/catalog-import/analyze', { text }); } catch (err) { return toast(err.message, 'error'); }
+    const options = (current) => `<option value="">— ignorer —</option>${Object.entries(a.fields).map(([k, l]) =>
+      `<option value="${k}" ${current === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}`;
+    $('#step2').innerHTML = `<div class="card">
+      <h2 style="margin-top:0">Colonnes du fichier</h2>
+      <p class="muted">${plural(a.rows, 'ligne')}. Vérifiez à quoi correspond chaque colonne (reconnues automatiquement, corrigez si besoin).</p>
+      <div class="table-wrap"><table class="dense map-table"><thead><tr><th>Colonne du fichier</th><th>Correspond à</th><th>Exemples</th></tr></thead>
+        <tbody>${a.headers.map((h, i) => `<tr><td><b>${esc(h)}</b></td>
+          <td><select class="map" data-i="${i}">${options(a.mapping[i])}</select></td>
+          <td class="small muted">${a.sample.map((r) => esc((r[i] ?? '').slice(0, 40))).filter(Boolean).slice(0, 3).join(' · ')}</td></tr>`).join('')}</tbody></table></div>
+      <div class="grid grid-2" style="margin-top:1rem">
+        <label>Type par défaut (si le fichier ne le précise pas)<select id="default-type">${types.map(([k, t]) =>
+          `<option value="${k}" ${k === 'album' ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select></label>
+        <label class="check" style="align-self:end"><input type="checkbox" id="keep-numbers" checked>
+          Garder les numéros d'exemplaire du fichier (« 000012 » devient « 12 »), s'ils sont libres</label></div>
+      <div class="actions"><button class="btn btn-primary" id="preview">👀 Prévisualiser</button></div>
+      <div id="report"></div></div>`;
+
+    const payload = () => ({
+      text,
+      mapping: $$('.map').map((s) => s.value),
+      default_type: $('#default-type').value,
+      keep_numbers: $('#keep-numbers').checked,
+    });
+    $('#preview').onclick = async () => {
+      try {
+        const r = await api.post('/catalog-import', { ...payload(), dry_run: true });
+        showImportReport(r, true, async (btn) => {
+          btn.disabled = true;
+          btn.textContent = 'Import en cours…';
+          try {
+            const done = await api.post('/catalog-import', payload());
+            showImportReport(done, false);
+            toast(`${plural(done.documents, 'livre importé', 'livres importés')}`);
+          } catch (err) { toast(err.message, 'error'); btn.disabled = false; }
+        });
+      } catch (err) { toast(err.message, 'error'); }
+    };
+  };
+}
+
+function showImportReport(r, dry, onConfirm) {
+  $('#report').innerHTML = `<h3>${dry ? 'Aperçu' : '✅ Import terminé'}</h3>
+    <div class="stats">
+      <div class="stat"><b>${r.documents}</b><span>${dry ? 'livres à importer' : 'livres importés'}</span></div>
+      <div class="stat"><b>${r.copies}</b><span>exemplaires</span></div>
+      <div class="stat"><b>${r.skipped.length}</b><span>déjà dans la BCD (ignorés)</span></div>
+      ${r.renumbered ? `<div class="stat"><b>${r.renumbered}</b><span>renumérotés (numéro déjà pris)</span></div>` : ''}</div>
+    ${r.errors.length ? `<details><summary>⚠️ ${plural(r.errors.length, 'ligne ignorée', 'lignes ignorées')}</summary>
+      <ul class="log">${r.errors.slice(0, 50).map((e) => `<li class="warn">${esc(e)}</li>`).join('')}</ul></details>` : ''}
+    ${dry && r.sample.length ? `<p class="muted small">Exemples :</p><div class="table-wrap"><table class="dense"><thead><tr><th>Titre</th><th>Auteur(s)</th><th>Cote</th><th>Type</th><th class="num">Ex.</th></tr></thead>
+      <tbody>${r.sample.map((d) => `<tr><td>${esc(d.title)}</td><td>${esc(d.authors ?? '')}</td><td><span class="cote">${esc(d.cote ?? '')}</span></td>
+        <td class="small">${esc(typeLabel(d.doc_type))}</td><td class="num">${d.copies}</td></tr>`).join('')}</tbody></table></div>` : ''}
+    <div class="actions">${dry ? `<button class="btn btn-primary btn-lg" id="go" ${r.documents ? '' : 'disabled'}>✅ Importer ${plural(r.documents, 'livre')}</button>`
+      : '<a class="btn btn-primary" href="#/inventaire">📚 Voir tous les livres</a>'}</div>
+    ${!dry ? '<p class="muted small">Astuce : les fiches importées n\'ont souvent pas de résumé ni d\'image. Vous pouvez ajouter une couverture depuis la fiche de chaque livre (« 📷 Ajouter une couverture »).</p>' : ''}`;
+  if (dry) $('#go').onclick = (e) => onConfirm(e.target);
 }
 
 /* ---------- Listes ---------- */

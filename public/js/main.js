@@ -33,6 +33,7 @@ const ROUTES = [
   [/^\/catalogue$/, catalogue, ['admin', 'enseignant']],
   [/^\/inventaire$/, catalogue, ['admin', 'enseignant']],
   [/^\/themes$/, catalogue, ['admin', 'enseignant']],
+  [/^\/import-livres$/, catalogue, ['admin']],
   [/^\/document\/nouveau$/, documentPage, ['admin', 'enseignant']],
   [/^\/document\/(\d+)$/, documentPage, ['admin', 'enseignant', 'eleve']],
   [/^\/document\/(\d+)\/modifier$/, documentPage, ['admin', 'enseignant']],
@@ -64,7 +65,7 @@ function renderNav() {
   $('#school-name').textContent = state.info?.school_name ?? 'BCD';
   if (!u) { nav.innerHTML = ''; $('#user-box').innerHTML = ''; return; }
   let current = '#' + (location.hash.slice(1).split('?')[0] || '/');
-  if (['#/inventaire', '#/themes', '#/desherbage'].includes(current)) current = '#/catalogue';
+  if (['#/inventaire', '#/themes', '#/desherbage', '#/import-livres'].includes(current)) current = '#/catalogue';
   nav.innerHTML = NAV[u.role].map(([href, icon, label]) =>
     `<a href="${href}" class="${current === href ? 'active' : ''}"><span class="nav-icon">${icon}</span><span>${label}</span></a>`).join('');
   $('#user-box').innerHTML = `<a href="#/mon-compte" class="user-chip" title="Mon compte">

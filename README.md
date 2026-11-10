@@ -63,6 +63,12 @@ Derrière un proxy (réseau académique…) : `NODE_USE_ENV_PROXY=1 HTTPS_PROXY=
   (API SRU, format UNIMARC), complétée si besoin par Open Library et Google Books (couverture, résumé).
   Détection des doublons (« ajouter un exemplaire ? »). **Accents abîmés corrigés automatiquement**
   (« kilomÃ¨tre » → « kilomètre »), avec un outil pour réparer les textes déjà enregistrés.
+- **Couvertures** : si aucune source n'a d'image, bouton « 📷 Ajouter une couverture » (photo ou image du PC,
+  ou image copiée puis collée avec Ctrl+V). L'image est réduite et rangée dans la base : elle marche sans Internet.
+- **Import d'un catalogue existant** (Catalogue → Importer) : export CSV d'**Hibouthèque**
+  (Administration → Document → Export des documents en CSV), BCDI, PMB ou tableur, en CSV ou XML.
+  Colonnes reconnues automatiquement et modifiables, aperçu avant import, exemplaires regroupés,
+  numéros d'origine conservés, livres déjà présents ignorés.
 - **Ajout, modification, suppression** de documents et d'exemplaires. Chaque exemplaire reçoit un **numéro simple**
   (1, 2, 3… dans l'ordre d'enregistrement) à écrire sur le livre ; état (bon, abîmé, perdu, en réparation).
 - **Désherbage** : recherche des candidats (parus avant telle année, non empruntés depuis N ans, abîmés/perdus),

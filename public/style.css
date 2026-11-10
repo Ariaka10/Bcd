@@ -338,3 +338,8 @@ a.kid-loan { text-decoration: none; color: inherit; }
   .review-buttons { justify-content: center; }
 }
 .brand span:last-child { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; }
+
+/* v1.2 : couvertures et import */
+.cover-actions { display: grid; gap: .3rem; margin-top: .5rem; }
+.cover-box { display: grid; grid-template-columns: 110px 1fr; gap: .8rem; align-items: start; }
+.map-table select { width: auto; min-width: 14rem; }

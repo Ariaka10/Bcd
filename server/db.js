@@ -151,6 +151,14 @@ CREATE TABLE IF NOT EXISTS reservations (
   created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_reservations_doc ON reservations(document_id, status);
+
+-- Couvertures ajoutées à la main (photo, image du PC), stockées dans la base pour fonctionner sans Internet.
+CREATE TABLE IF NOT EXISTS covers (
+  document_id INTEGER PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
+  mime TEXT NOT NULL,
+  data BLOB NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `;
 
 export const DEFAULT_SETTINGS = {

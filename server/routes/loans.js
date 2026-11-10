@@ -36,6 +36,7 @@ function decorate(loans) {
 function findCopy(db, code, { forLoan }) {
   code = String(code ?? '').trim();
   if (!code) throw new HttpError(400, 'Numéro du livre manquant');
+  if (/^0+\d+$/.test(code)) code = String(Number(code)); // « 012 » = « 12 »
   const copy = db.prepare('SELECT * FROM copies WHERE barcode = ? COLLATE NOCASE').get(code);
   if (copy) return copy;
   const isbn = toIsbn13(code);
@@ -249,7 +250,7 @@ export default function (r) {
         (SELECT u.first_name || ' ' || u.last_name FROM reservations rv JOIN users u ON u.id = rv.user_id
           WHERE rv.document_id = d.id AND rv.status = 'prete' ORDER BY rv.ready_at LIMIT 1) AS held_for
       FROM copies c JOIN documents d ON d.id = c.document_id`;
-    const exact = db.prepare(`${select} WHERE c.barcode = ? COLLATE NOCASE`).all(q);
+    const exact = db.prepare(`${select} WHERE c.barcode = ? COLLATE NOCASE`).all(/^0+\d+$/.test(q) ? String(Number(q)) : q);
     const words = normalize(q).split(' ').filter(Boolean);
     const byTitle = db.prepare(`${select} WHERE ${words.map(() => `norm(d.title || ' ' || coalesce(d.subtitle, '') || ' '
         || coalesce(d.authors, '') || ' ' || coalesce(d.series, '')) LIKE ?`).join(' AND ')}

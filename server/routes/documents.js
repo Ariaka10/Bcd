@@ -7,6 +7,15 @@ import { lookupIsbn as defaultLookup } from '../notice.js';
 import { toCsv } from '../csv.js';
 import { fixMojibake, fixFields } from '../text.js';
 import { getSettings } from '../db.js';
+import { readTable, guessMapping, importCatalog, IMPORT_FIELDS } from '../catalog-import.js';
+
+/** Type d'image d'après ses premiers octets. */
+function imageType(buf) {
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (buf.subarray(0, 4).toString('latin1') === 'RIFF' && buf.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
+  return null;
+}
 
 const DOC_FIELDS = [
   'isbn', 'title', 'subtitle', 'authors', 'publisher', 'pub_year', 'pages', 'series', 'series_number',
@@ -229,6 +238,54 @@ export default function (r, deps) {
   const lookup = deps.lookupIsbn ?? defaultLookup;
 
   r.get('/api/meta', () => ({ doc_types: DOC_TYPES, copy_states: COPY_STATES }));
+
+  /* ----- Couverture ajoutée à la main (photo ou image du PC) ----- */
+
+  r.get('/api/documents/:id/cover', anyUser, ({ db, params, res }) => {
+    const c = db.prepare('SELECT mime, data FROM covers WHERE document_id = ?').get(params.id);
+    if (!c) throw new HttpError(404, 'Pas de couverture');
+    res.writeHead(200, { 'Content-Type': c.mime, 'Content-Length': c.data.length, 'Cache-Control': 'private, max-age=31536000' });
+    res.end(Buffer.from(c.data));
+  });
+
+  r.put('/api/documents/:id/cover', staff, ({ db, params, raw }) => {
+    if (!db.prepare('SELECT 1 FROM documents WHERE id = ?').get(params.id)) throw new HttpError(404, 'Document introuvable');
+    if (!raw?.length) throw new HttpError(400, 'Image manquante');
+    if (raw.length > 3 * 1024 * 1024) throw new HttpError(413, 'Image trop lourde (3 Mo maximum)');
+    const mime = imageType(raw);
+    if (!mime) throw new HttpError(400, 'Format d\'image non reconnu (JPEG, PNG ou WebP)');
+    const id = Number(params.id);
+    tx(db, () => {
+      db.prepare(`INSERT INTO covers (document_id, mime, data) VALUES (?, ?, ?)
+        ON CONFLICT(document_id) DO UPDATE SET mime = excluded.mime, data = excluded.data, updated_at = datetime('now')`).run(id, mime, raw);
+      // Paramètre « v » : force le navigateur à afficher la nouvelle image.
+      db.prepare(`UPDATE documents SET cover_url = ?, updated_at = datetime('now') WHERE id = ?`).run(`/api/documents/${id}/cover?v=${Date.now()}`, id);
+    });
+    return { ok: true, cover_url: db.prepare('SELECT cover_url FROM documents WHERE id = ?').get(id).cover_url };
+  });
+
+  r.delete('/api/documents/:id/cover', staff, ({ db, params }) => {
+    tx(db, () => {
+      db.prepare('DELETE FROM covers WHERE document_id = ?').run(params.id);
+      db.prepare(`UPDATE documents SET cover_url = NULL WHERE id = ? AND cover_url LIKE '/api/documents/%/cover%'`).run(params.id);
+    });
+    return { ok: true };
+  });
+
+  /* ----- Import d'un catalogue existant (Hibouthèque, BCDI, PMB, tableur…) ----- */
+
+  r.post('/api/catalog-import/analyze', admin, ({ body }) => {
+    const table = readTable(body.text);
+    return {
+      headers: table.headers,
+      mapping: guessMapping(table.headers),
+      rows: table.rows.length,
+      sample: table.rows.slice(0, 5),
+      fields: Object.fromEntries(Object.entries(IMPORT_FIELDS).map(([k, f]) => [k, f.label])),
+    };
+  });
+
+  r.post('/api/catalog-import', admin, ({ db, body }) => importCatalog(db, body));
 
   const restrictForStudent = (db, user) => user.role === 'eleve' && getSettings(db).restrict_student_catalog === '1';
 

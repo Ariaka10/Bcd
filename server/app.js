@@ -1,3 +1,4 @@
+import { createCoverService } from './covers.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Router, readJson, readRaw, parseCookies, sendJson, serveStatic } from './http.js';
@@ -24,11 +25,13 @@ function loadUser(db, token) {
 
 /**
  * Options : `lookupIsbn` (recherche de notices, remplaçable pour les tests),
- * `backupDir` (dossier des sauvegardes automatiques, version bureau).
+ * `backupDir` (dossier des sauvegardes automatiques, version bureau),
+ * `autoCovers` (cherche la couverture de chaque livre enregistré), `coverPauseMs` (pause entre deux livres).
  */
-export function createApp(db, { lookupIsbn, backupDir, appInfo, installUpdate, checkUpdate, chooseFolder } = {}) {
+export function createApp(db, { lookupIsbn, backupDir, appInfo, installUpdate, checkUpdate, chooseFolder, autoCovers = false, coverPauseMs } = {}) {
   const router = new Router();
-  const deps = { lookupIsbn, backupDir, appInfo, installUpdate, checkUpdate, chooseFolder };
+  const covers = createCoverService(db, { pauseMs: coverPauseMs ?? 1000 });
+  const deps = { lookupIsbn, backupDir, appInfo, installUpdate, checkUpdate, chooseFolder, covers, autoCovers };
   authRoutes(router, deps);
   documentRoutes(router, deps);
   loanRoutes(router, deps);
@@ -37,7 +40,10 @@ export function createApp(db, { lookupIsbn, backupDir, appInfo, installUpdate, c
   adminRoutes(router, deps);
   themeRoutes(router, deps);
 
-  return async function handler(req, res) {
+  handler.covers = covers; // accès pour les tests
+  return handler;
+
+  async function handler(req, res) {
     const url = new URL(req.url, 'http://localhost');
     try {
       if (!url.pathname.startsWith('/api/')) {
@@ -68,5 +74,5 @@ export function createApp(db, { lookupIsbn, backupDir, appInfo, installUpdate, c
       if (e instanceof HttpError && e.code) body.code = e.code;
       if (!res.headersSent) sendJson(res, status, body);
     }
-  };
+  }
 }

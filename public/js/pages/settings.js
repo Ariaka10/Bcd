@@ -34,9 +34,11 @@ export async function render(app, { path }) {
         Elles sont maintenant corrigées automatiquement ; ce bouton répare celles déjà enregistrées.</p>
       <button class="btn" id="repair">🩹 Chercher les textes à réparer</button>
       <div id="repair-result"></div></div>
+    <div class="card" id="covers"></div>
     <div class="card" id="backups"></div>
     <div class="card" id="extra"></div>
     <div class="card" id="version"></div>`;
+  renderCovers();
   renderBackups();
   renderExtra();
   renderVersion();
@@ -116,6 +118,49 @@ async function renderAccount(app) {
       navigate(location.hash);
     } catch (err) { toast(err.message, 'error'); }
   };
+}
+
+/* ---------- Couvertures manquantes ---------- */
+
+const plural = (n, one, many) => `${n} ${n > 1 ? many : one}`;
+
+async function renderCovers() {
+  const box = $('#covers');
+  if (!box) return; // page quittée entre-temps
+  const st = await api.get('/admin/covers');
+  const job = st.job;
+  const running = job?.running;
+  const pct = job?.total ? Math.round((job.done / job.total) * 100) : 0;
+  box.innerHTML = `<h2 style="margin-top:0">🖼️ Couvertures des livres</h2>
+    <p class="muted">À chaque livre enregistré, l'application cherche sa couverture sur Internet (BnF, Open Library, Google Books)
+      et la garde sur l'ordinateur : elle s'affiche ensuite même sans connexion. Seul l'ISBN du livre est envoyé.</p>
+    <p>${plural(st.with_cover, 'livre a sa couverture', 'livres ont leur couverture')} sur ${st.total}.
+      ${st.to_search ? `<b>${plural(st.to_search, 'livre à chercher', 'livres à chercher')}</b>.` : ''}
+      ${st.not_found ? `<span class="muted">${plural(st.not_found, 'introuvable', 'introuvables')} lors d'une recherche précédente.</span>` : ''}
+      ${st.no_isbn ? `<span class="muted">${plural(st.no_isbn, 'livre sans ISBN', 'livres sans ISBN')} (photo ou image à ajouter à la main).</span>` : ''}</p>
+    ${running ? `<div class="progress"><span style="width:${pct}%"></span></div>
+      <p class="small">Recherche en cours : ${job.done} / ${job.total} — ${plural(job.found, 'trouvée', 'trouvées')}.
+        Vous pouvez continuer à utiliser l'application.</p>
+      <div class="row"><button class="btn" id="covers-stop">⏹️ Arrêter</button></div>`
+    : `${job?.finished_at ? `<p class="${job.error ? 'badge badge-late' : 'badge badge-ok'}" style="display:inline-block">
+        ${job.error ? esc(job.error) : `${job.stopped ? 'Recherche arrêtée' : 'Recherche terminée'} :
+        ${plural(job.found, 'couverture trouvée', 'couvertures trouvées')}, ${plural(job.missing, 'introuvable', 'introuvables')}${job.errors ? `, ${plural(job.errors, 'erreur de connexion', 'erreurs de connexion')}` : ''}.`}</p>` : ''}
+      <div class="row">
+        <button class="btn btn-primary" id="covers-start" ${st.to_search || st.not_found ? '' : 'disabled'}>🔎 Chercher les couvertures manquantes</button>
+        ${st.not_found ? `<label class="check"><input type="checkbox" id="covers-retry" ${st.to_search ? '' : 'checked'}> Réessayer aussi les ${st.not_found} introuvables</label>` : ''}</div>
+      <p class="small muted">Un livre à la fois, avec une petite pause (1 à 2 secondes par livre). On peut arrêter et reprendre plus tard.</p>`}`;
+
+  const start = $('#covers-start', box);
+  if (start) start.onclick = async () => {
+    const retry = $('#covers-retry', box)?.checked ?? false;
+    if (!st.to_search && !retry) return toast('Cochez « Réessayer aussi les introuvables »', 'error');
+    await api.post('/admin/covers/start', { retry });
+    renderCovers();
+  };
+  const stop = $('#covers-stop', box);
+  if (stop) stop.onclick = async () => { await api.post('/admin/covers/stop'); renderCovers(); };
+  // Suivi de l'avancement tant que la page est affichée.
+  if (running) setTimeout(() => { if (box.isConnected) renderCovers(); }, 1500);
 }
 
 /* ---------- Sauvegardes ---------- */

@@ -11,7 +11,12 @@ function tempFile() {
   return path.join(os.tmpdir(), `bcd-${randomToken().slice(0, 12)}.sqlite`);
 }
 
-export default function (r, { backupDir, appInfo, installUpdate, checkUpdate, chooseFolder } = {}) {
+export default function (r, { backupDir, appInfo, installUpdate, checkUpdate, chooseFolder, covers } = {}) {
+  /* ----- Couvertures manquantes : recherche sur Internet, un livre à la fois ----- */
+  r.get('/api/admin/covers', admin, () => covers.status());
+  r.post('/api/admin/covers/start', admin, ({ body }) => covers.start({ retry: !!body?.retry }));
+  r.post('/api/admin/covers/stop', admin, () => covers.stop());
+
   // Téléchargement d'une copie complète de la base.
   r.get('/api/admin/backup', admin, ({ db, res }) => {
     const tmp = snapshot(db, tempFile());

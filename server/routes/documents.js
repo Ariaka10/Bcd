@@ -8,6 +8,7 @@ import { toCsv } from '../csv.js';
 import { fixMojibake, fixFields } from '../text.js';
 import { getSettings } from '../db.js';
 import { readTable, guessMapping, importCatalog, IMPORT_FIELDS } from '../catalog-import.js';
+import { storeCover } from '../covers.js';
 
 /** Type d'image d'après ses premiers octets. */
 function imageType(buf) {
@@ -257,19 +258,15 @@ export default function (r, deps) {
     const mime = imageType(raw);
     if (!mime) throw new HttpError(400, 'Format d\'image non reconnu (JPEG, PNG ou WebP)');
     const id = Number(params.id);
-    tx(db, () => {
-      db.prepare(`INSERT INTO covers (document_id, mime, data) VALUES (?, ?, ?)
-        ON CONFLICT(document_id) DO UPDATE SET mime = excluded.mime, data = excluded.data, updated_at = datetime('now')`).run(id, mime, raw);
-      // Paramètre « v » : force le navigateur à afficher la nouvelle image.
-      db.prepare(`UPDATE documents SET cover_url = ?, updated_at = datetime('now') WHERE id = ?`).run(`/api/documents/${id}/cover?v=${Date.now()}`, id);
-    });
+    storeCover(db, id, { mime, data: raw, source: 'manuel' });
     return { ok: true, cover_url: db.prepare('SELECT cover_url FROM documents WHERE id = ?').get(id).cover_url };
   });
 
   r.delete('/api/documents/:id/cover', staff, ({ db, params }) => {
     tx(db, () => {
       db.prepare('DELETE FROM covers WHERE document_id = ?').run(params.id);
-      db.prepare(`UPDATE documents SET cover_url = NULL WHERE id = ? AND cover_url LIKE '/api/documents/%/cover%'`).run(params.id);
+      // Couverture retirée volontairement : la recherche automatique ne la remet pas.
+      db.prepare(`UPDATE documents SET cover_url = NULL, cover_tried_at = datetime('now') WHERE id = ?`).run(params.id);
     });
     return { ok: true };
   });
@@ -349,6 +346,8 @@ export default function (r, deps) {
     const id = Number(lastInsertRowid);
     setThemes(db, id, body.theme_ids);
     const barcodes = addCopies(db, id, { count: body.copies ?? 1, barcodes: body.barcodes ?? [] });
+    // La couverture est cherchée juste après, sans faire attendre l'enregistrement.
+    if (deps.autoCovers) setImmediate(() => deps.covers.queue(id));
     return { id, cote: d.cote, barcodes };
   }));
 
@@ -361,6 +360,11 @@ export default function (r, deps) {
         .run(...DOC_FIELDS.map((c) => d[c] ?? null), existing.id);
       setThemes(db, existing.id, body.theme_ids);
     });
+    // ISBN ajouté ou nouvelle adresse d'image : on retente la couverture.
+    const changed = (d.isbn ?? null) !== (existing.isbn ?? null)
+      || (/^https?:/.test(d.cover_url ?? '') && d.cover_url !== existing.cover_url);
+    if (changed) db.prepare('UPDATE documents SET cover_tried_at = NULL WHERE id = ?').run(existing.id);
+    if (deps.autoCovers && (changed || existing.cover_tried_at == null)) setImmediate(() => deps.covers.queue(existing.id));
     return { id: existing.id, cote: d.cote };
   });
 

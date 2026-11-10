@@ -97,11 +97,17 @@ export function setFetch(fn) {
   fetchImpl = fn;
 }
 
-async function fetchWithTimeout(url) {
+export async function fetchWithTimeout(url, timeout = TIMEOUT_MS) {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  const t = setTimeout(() => ctrl.abort(), timeout);
   try {
-    return await fetchImpl(url, { signal: ctrl.signal, headers: { 'User-Agent': 'BCD-gestion/1.0' } });
+    // Lecture du corps comprise dans le délai : une image coupée en route ne bloque pas.
+    const res = await fetchImpl(url, { signal: ctrl.signal, headers: { 'User-Agent': 'BCD-gestion/1.0' } });
+    const body = Buffer.from(await res.arrayBuffer());
+    return {
+      ok: res.ok, status: res.status, headers: res.headers, body,
+      text: async () => body.toString('utf8'), json: async () => JSON.parse(body.toString('utf8')),
+    };
   } finally {
     clearTimeout(t);
   }

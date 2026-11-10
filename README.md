@@ -57,7 +57,9 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
 ### Catalogue
 - **Notices prêtes à l'emploi par ISBN** : catalogue de la **BnF**, complété par Open Library et Google Books
   (couverture, résumé). Doublons détectés, accents abîmés corrigés automatiquement.
-- **Couverture** : si aucune source n'en a, photo ou image du PC (ou collée avec Ctrl+V), conservée hors ligne.
+- **Couvertures automatiques** : récupérées à l'enregistrement (BnF, Open Library, Google Books) et gardées sur l'ordinateur,
+  donc visibles même sans Internet ; bouton pour chercher en une fois celles des livres déjà enregistrés ou importés.
+  Sinon, photo ou image du PC (ou collée avec Ctrl+V).
 - **Cotes calculées automatiquement** : genre + 3 lettres de l'auteur (`A RAM`, `R DAH`, `BD AST`…),
   indice Dewey pour les documentaires (`590 LED`).
 - **Numéros d'exemplaire simples** (1, 2, 3…), affichés en grand à l'enregistrement pour les écrire sur le livre.
@@ -91,8 +93,8 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
 
 ### Sécurité des données
 - Les données restent **sur l'ordinateur** (`Documents\BCD`), rien n'est ouvert sur le réseau.
-  Internet ne sert qu'à chercher les notices par ISBN (BnF, Open Library, Google Books), afficher les couvertures
-  et vérifier les mises à jour : aucune donnée d'élève n'est envoyée.
+  Internet ne sert qu'à chercher les notices et les couvertures par ISBN (BnF, Open Library, Google Books)
+  et à vérifier les mises à jour : aucune donnée d'élève n'est envoyée.
 - **Sauvegarde automatique** toutes les 30 minutes pendant l'utilisation et à chaque fermeture, **copie sur clé USB**,
   restauration en un clic. Chaque modification est enregistrée immédiatement : une coupure de courant ne fait pas perdre la journée.
 - **Assistant de rentrée** : suppression des données des élèves partis (RGPD).
@@ -132,6 +134,7 @@ electron/            application de bureau (fenêtre, menu, sauvegardes, mises �
 server/              API HTTP (Node.js)
   routes/            catalogue, prêts, usagers, thèmes, listes, administration
   notice.js          notices BnF / Open Library / Google Books
+  covers.js          couvertures récupérées et gardées dans la base
   catalog-import.js  import Hibouthèque / CSV / XML
   cote.js            calcul des cotes
   backup.js          sauvegardes, clé USB, restauration

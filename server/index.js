@@ -13,7 +13,7 @@ const host = process.env.HOST ?? '0.0.0.0';
 const db = openDb(dbFile);
 // Version serveur : sauvegardes périodiques à côté de la base (dossier « sauvegardes »).
 startPeriodicBackups(db, path.join(path.dirname(dbFile), 'sauvegardes'));
-const server = http.createServer(createApp(db));
+const server = http.createServer(createApp(db, { autoCovers: true }));
 server.listen(port, host, () => {
   console.log(`BCD prête sur http://localhost:${port}  (base : ${dbFile})`);
 });

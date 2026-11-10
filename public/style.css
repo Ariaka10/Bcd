@@ -383,3 +383,7 @@ a.kid-loan { text-decoration: none; color: inherit; }
   .cut-line { margin: 0; }
   .cut-line span { background: #fff; }
 }
+
+/* Barre d'avancement (recherche des couvertures) */
+.progress { height: 12px; border-radius: 99px; background: var(--line); overflow: hidden; margin: .4rem 0; max-width: 520px; }
+.progress span { display: block; height: 100%; background: var(--primary); border-radius: 99px; transition: width .4s; }

@@ -2,6 +2,17 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
+## [1.3.1] — 2026-11-11
+
+### Ajouté
+- **Sauvegardes pendant l'utilisation** : toutes les 30 minutes, s'il y a eu des changements (les 12 dernières
+  sont gardées, soit une journée de travail), en plus de celles faites à la fermeture.
+- **Page Releases** sur GitHub : chaque version publiée y apparaît avec l'installateur, le zip et ses notes.
+
+### Modifié
+- Chaque modification est écrite sur le disque dès qu'elle est validée : une coupure de courant
+  ne fait perdre, au plus, que l'opération en cours.
+
 ## [1.3.0] — 2026-11-10
 
 ### Ajouté

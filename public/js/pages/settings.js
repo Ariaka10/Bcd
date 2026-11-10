@@ -100,7 +100,7 @@ async function renderAccount(app) {
 
 /* ---------- Sauvegardes ---------- */
 
-const KINDS = { 'bcd-auto': 'automatique', 'bcd-manuelle': 'manuelle', 'bcd-avant-restauration': 'avant restauration' };
+const KINDS = { 'bcd-auto': 'à la fermeture', 'bcd-periodique': 'pendant l\'utilisation', 'bcd-manuelle': 'manuelle', 'bcd-avant-restauration': 'avant restauration' };
 const kindOf = (name) => (name.startsWith('bcd-avant-version') ? 'avant mise à jour'
   : KINDS[Object.keys(KINDS).find((k) => name.startsWith(k + '_'))] ?? '');
 const WARN = 'Toutes les données actuelles seront remplacées par celles de la sauvegarde. Une copie de sécurité de l\'état actuel est faite avant.';
@@ -124,7 +124,7 @@ async function renderBackups() {
         <input type="file" id="restore-file" accept=".sqlite,.db" hidden></label>
       ${dir ? '<button class="btn" id="backup-now">💾 Sauvegarder maintenant</button>' : ''}</div>
     ${dir ? `<h3>Sauvegardes enregistrées sur cet ordinateur</h3>
-      <p class="small muted">Une sauvegarde est faite automatiquement à chaque fermeture (les 15 dernières sont gardées).<br>
+      <p class="small muted">Sauvegardes automatiques : toutes les 30 minutes pendant l'utilisation s'il y a eu des changements (les 12 dernières), et à chaque fermeture (les 15 dernières). Chaque modification est en plus enregistrée immédiatement : une coupure de courant ne fait pas perdre le travail de la journée.<br>
         Dossier : <code>${esc(dir)}</code></p>
       ${items.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th class="num">Taille</th><th></th></tr></thead>
         <tbody>${items.map((b) => `<tr><td>${fmtDate(b.date)} ${new Date(b.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</td>

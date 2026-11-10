@@ -17,7 +17,7 @@ Gratuite, en français, sans abonnement, et les données restent sur l'ordinateu
 | 📚 **Catalogue** | Ajout d'un livre en tapant son ISBN : la fiche arrive de la **BnF**. Cote calculée automatiquement, numéro d'exemplaire simple (1, 2, 3…), couverture, thèmes, mots-clés. |
 | 🛎️ **Prêts** | Comptoir **sans douchette** : on touche l'avatar de l'enfant, on tape le numéro ou le titre du livre. Retards, réservations, prêt à toute une classe, fin d'année. |
 | 🧒 **Élèves** | Import depuis **ONDE**, connexion par **avatar** (sans mot de passe), thèmes en gros boutons, avis en frimousses 😍🙂😐. |
-| 💾 **Sécurité** | Sauvegarde à chaque fermeture, copie sur **clé USB**, assistant de rentrée. Rien n'est envoyé sur Internet (sauf l'ISBN pour trouver la notice). |
+| 💾 **Sécurité** | Sauvegarde toutes les 30 minutes et à chaque fermeture, copie sur **clé USB**, assistant de rentrée. Rien n'est envoyé sur Internet (sauf l'ISBN pour trouver la notice). |
 | 🪟 **Windows** | Un installateur, ou un **zip sans installation** pour les PC qui bloquent les installations. Rien d'autre à installer. |
 
 ## 📥 Télécharger et installer
@@ -85,7 +85,8 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
 
 ### Sécurité des données
 - Les données restent **sur l'ordinateur** (`Documents\BCD`), rien n'est ouvert sur le réseau.
-- **Sauvegarde automatique** à chaque fermeture (15 gardées), **copie sur clé USB**, restauration en un clic.
+- **Sauvegarde automatique** toutes les 30 minutes pendant l'utilisation et à chaque fermeture, **copie sur clé USB**,
+  restauration en un clic. Chaque modification est enregistrée immédiatement : une coupure de courant ne fait pas perdre la journée.
 - **Assistant de rentrée** : suppression des données des élèves partis (RGPD).
 - Copie de sécurité avant chaque mise à jour de l'application.
 
@@ -114,8 +115,9 @@ npm run dist:win   # fabriquer l'installateur et le zip Windows (sous Windows)
 
 Variables : `PORT`, `BCD_DB` (chemin de la base). Derrière un proxy : `NODE_USE_ENV_PROXY=1 HTTPS_PROXY=… npm start`.
 
-Publier une version : changer `version` dans `package.json`, compléter le `CHANGELOG.md`,
-puis créer une étiquette `vX.Y.Z` (`git tag v1.3.0 && git push --tags`) : GitHub fabrique, teste et publie les fichiers.
+Publier une version : changer `version` dans `package.json`, ajouter sa rubrique dans le `CHANGELOG.md`,
+puis fusionner dans `main`. GitHub fabrique et teste l'application sur Windows, puis crée la **Release** `vX.Y.Z`
+avec l'installateur, le zip et les notes du CHANGELOG (une seule fois par version).
 
 ```
 electron/            application de bureau (fenêtre, menu, sauvegardes, mises à jour)

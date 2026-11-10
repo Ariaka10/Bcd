@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from '../server/db.js';
 import { createApp } from '../server/app.js';
-import { autoBackup, backupFileName, copyToExtraDir } from '../server/backup.js';
+import { autoBackup, backupFileName, copyToExtraDir, startPeriodicBackups } from '../server/backup.js';
 import { setFetch } from '../server/notice.js';
 import { DatabaseSync } from 'node:sqlite';
 import { checkForUpdate, updateInfo, installUpdate } from './updater.js';
@@ -122,6 +122,9 @@ async function start() {
     }
   }
   if (SMOKE_TEST) return smokeTest(origin);
+
+  // Sauvegarde toutes les 30 minutes pendant l'utilisation (s'il y a eu des changements).
+  startPeriodicBackups(db, backupDir, { minutes: Number(process.env.BCD_BACKUP_MINUTES) || 30 });
 
   // Nouvelle version ? Vérification au démarrage puis une fois par jour.
   setTimeout(checkForUpdate, 5000);

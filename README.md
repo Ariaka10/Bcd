@@ -115,8 +115,9 @@ npm run dist:win   # fabriquer l'installateur et le zip Windows (sous Windows)
 
 Variables : `PORT`, `BCD_DB` (chemin de la base). Derrière un proxy : `NODE_USE_ENV_PROXY=1 HTTPS_PROXY=… npm start`.
 
-Publier une version : changer `version` dans `package.json`, compléter le `CHANGELOG.md`,
-puis créer une étiquette `vX.Y.Z` (`git tag v1.3.0 && git push --tags`) : GitHub fabrique, teste et publie les fichiers.
+Publier une version : changer `version` dans `package.json`, ajouter sa rubrique dans le `CHANGELOG.md`,
+puis fusionner dans `main`. GitHub fabrique et teste l'application sur Windows, puis crée la **Release** `vX.Y.Z`
+avec l'installateur, le zip et les notes du CHANGELOG (une seule fois par version).
 
 ```
 electron/            application de bureau (fenêtre, menu, sauvegardes, mises à jour)

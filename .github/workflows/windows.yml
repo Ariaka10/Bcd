@@ -1,6 +1,7 @@
 # Fabrique l'installateur Windows, l'installe sur une machine Windows et vérifie que l'application démarre.
-# Le fichier Installer-BCD-x.y.z.exe est disponible dans l'onglet « Actions » (rubrique Artifacts),
-# et, pour une version étiquetée (ex. v1.0.0), dans l'onglet « Releases ».
+# Les fichiers sont disponibles dans l'onglet « Actions » (rubrique Artifacts).
+# Publication : quand la branche main reçoit une version (champ « version » du package.json) qui n'a pas
+# encore de Release, celle-ci est créée automatiquement (étiquette vX.Y.Z, fichiers, notes du CHANGELOG).
 name: Application Windows
 
 on:
@@ -81,32 +82,51 @@ jobs:
             dist/BCD-*-sans-installation.zip
           retention-days: 30
 
-      - name: Préparer les notes de version (depuis le CHANGELOG)
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Faut-il publier une nouvelle version ?
+        id: rel
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
+            echo "::error::Étiquette $GITHUB_REF_NAME différente de la version du package.json ($VERSION)"; exit 1
+          fi
+          if [[ "$GITHUB_REF" == refs/heads/main ]] && git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null; then
+            echo "La version $VERSION est déjà publiée."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Préparer les notes de version (depuis le CHANGELOG)
+        if: steps.rel.outputs.publish == 'true'
+        shell: bash
+        env:
+          VERSION: ${{ steps.rel.outputs.version }}
         run: |
           node -e "
             const fs = require('fs');
-            const tag = process.env.GITHUB_REF_NAME.replace(/^v/, '');
-            const pkg = require('./package.json');
-            if (pkg.version !== tag) { console.error('Étiquette v' + tag + ' différente de la version du package.json (' + pkg.version + ')'); process.exit(1); }
+            const v = process.env.VERSION;
             const log = fs.readFileSync('CHANGELOG.md', 'utf8');
-            const start = log.indexOf('## [' + tag + ']');
-            if (start < 0) { console.error('Version ' + tag + ' absente du CHANGELOG'); process.exit(1); }
+            const start = log.indexOf('## [' + v + ']');
+            if (start < 0) { console.error('Version ' + v + ' absente du CHANGELOG'); process.exit(1); }
             const next = log.indexOf('\n## [', start + 1);
             const section = log.slice(start, next < 0 ? undefined : next).split('\n').slice(1).join('\n').trim();
-            const help = '\n\n---\n**Télécharger :** \`Installer-BCD-' + tag + '.exe\` (installation, sans droits administrateur) '
-              + 'ou \`BCD-' + tag + '-sans-installation.zip\` (à dézipper puis lancer BCD.exe).\n'
+            const help = '\n\n---\n**Télécharger :** \`Installer-BCD-' + v + '.exe\` (installation, sans droits administrateur) '
+              + 'ou \`BCD-' + v + '-sans-installation.zip\` (à dézipper puis lancer BCD.exe).\n'
               + 'Les données (Documents\\\\BCD) sont conservées lors de la mise à jour.';
             fs.writeFileSync('release-notes.md', section + help);
           "
           cat release-notes.md
 
       - name: Publier la version
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.rel.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          name: BCD ${{ github.ref_name }}
+          tag_name: v${{ steps.rel.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: BCD ${{ steps.rel.outputs.version }}
           body_path: release-notes.md
           files: |
             dist/Installer-BCD-*.exe

@@ -160,6 +160,26 @@ BEGIN
   UPDATE users SET archived_at = CASE WHEN NEW.active = 0 THEN datetime('now') ELSE NULL END WHERE id = NEW.id;
 END;
 
+-- Élève archivé (parti) ou supprimé : ses réservations sont annulées, et un livre qui lui était mis de côté
+-- passe au suivant de la liste d'attente.
+CREATE TRIGGER IF NOT EXISTS users_archived_reservations AFTER UPDATE OF active ON users
+  WHEN NEW.active = 0 AND OLD.active = 1
+BEGIN
+  UPDATE reservations SET status = 'prete', ready_at = datetime('now') WHERE id IN (
+    SELECT (SELECT r2.id FROM reservations r2 WHERE r2.document_id = r.document_id AND r2.status = 'attente'
+      AND r2.user_id != NEW.id ORDER BY r2.created_at, r2.id LIMIT 1)
+    FROM reservations r WHERE r.user_id = NEW.id AND r.status = 'prete');
+  UPDATE reservations SET status = 'annulee' WHERE user_id = NEW.id AND status IN ('attente', 'prete');
+END;
+
+CREATE TRIGGER IF NOT EXISTS users_deleted_reservations BEFORE DELETE ON users
+BEGIN
+  UPDATE reservations SET status = 'prete', ready_at = datetime('now') WHERE id IN (
+    SELECT (SELECT r2.id FROM reservations r2 WHERE r2.document_id = r.document_id AND r2.status = 'attente'
+      AND r2.user_id != OLD.id ORDER BY r2.created_at, r2.id LIMIT 1)
+    FROM reservations r WHERE r.user_id = OLD.id AND r.status = 'prete');
+END;
+
 -- Couvertures ajoutées à la main (photo, image du PC), stockées dans la base pour fonctionner sans Internet.
 CREATE TABLE IF NOT EXISTS covers (
   document_id INTEGER PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,

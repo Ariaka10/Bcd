@@ -70,7 +70,8 @@ test('assistant de rentrée', async () => {
   let r = await call('GET', '/api/admin/rentree');
   assert.equal(r.data.archived.length, 2);
   assert.equal(r.data.pending_loans, 1);
-  assert.deepEqual(r.data.empty_classes.map((c) => c.name), ['GS 2025']); // plus aucun élève actif
+  // Zoé (partie) a encore un livre : la classe n'est pas proposée à la suppression tant qu'il n'est pas rendu
+  assert.deepEqual(r.data.empty_classes.map((c) => c.name), []);
   r = await call('POST', '/api/admin/rentree/purge', { ids: [parti, gardeLivre] });
   assert.equal(r.data.deleted, 1); // Zoé a encore un livre : gardée
   await call('POST', '/api/loans/return', { barcode: '1' });
@@ -104,4 +105,22 @@ test('import ONDE : élèves qui partent avec un livre', async () => {
   const departed = (await call('GET', '/api/loans?departed=1')).data;
   assert.ok(departed.some((l) => l.user_id === part && l.title === 'Livre emporté'));
   assert.ok((await call('GET', '/api/stats')).data.departed_loans >= 1);
+});
+
+test('élève parti : ses réservations passent au suivant', async () => {
+  const doc = (await call('POST', '/api/documents', { title: 'Très demandé', doc_type: 'album' })).data;
+  const mk = async (f) => (await call('POST', '/api/users', { role: 'eleve', first_name: f, last_name: 'RES' })).data.id;
+  const [part, suivant, autre] = [await mk('Part'), await mk('Suivant'), await mk('Autre')];
+  await call('POST', '/api/reservations', { document_id: doc.id, user_id: part }); // mis de côté pour « Part »
+  await call('POST', '/api/reservations', { document_id: doc.id, user_id: suivant }); // en attente
+  await call('POST', '/api/users/batch', { ids: [part], action: 'archive' });
+  const res = db.prepare(`SELECT user_id, status FROM reservations WHERE document_id = ? AND status IN ('attente', 'prete')`).all(doc.id);
+  assert.deepEqual(res.map((r) => [r.user_id, r.status]), [[suivant, 'prete']]);
+  const r = await call('POST', '/api/loans', { user_id: autre, barcode: doc.barcodes[0] });
+  assert.equal(r.status, 409); // gardé pour « Suivant », plus pour l'élève parti
+  assert.match(r.data.error, /Suivant/);
+  // Suppression : même passage au suivant
+  await call('POST', '/api/reservations', { document_id: doc.id, user_id: autre });
+  await call('POST', '/api/users/batch', { ids: [suivant], action: 'delete' });
+  assert.equal(db.prepare(`SELECT status FROM reservations WHERE user_id = ? AND document_id = ?`).get(autre, doc.id).status, 'prete');
 });

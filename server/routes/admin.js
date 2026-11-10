@@ -178,6 +178,7 @@ export default function (r, { backupDir, appInfo, installUpdate, checkUpdate, ch
       empty_classes: db.prepare(`SELECT c.id, c.name FROM classes c
         WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.class_id = c.id AND u.active = 1)
           AND NOT EXISTS (SELECT 1 FROM loans l WHERE l.class_id = c.id AND l.returned_at IS NULL)
+          AND NOT EXISTS (SELECT 1 FROM loans l JOIN users u ON u.id = l.user_id WHERE u.class_id = c.id AND l.returned_at IS NULL)
         ORDER BY c.name`).all(),
     };
   });
@@ -201,7 +202,8 @@ export default function (r, { backupDir, appInfo, installUpdate, checkUpdate, ch
   r.post('/api/admin/rentree/classes', admin, ({ db, body }) => {
     const del = db.prepare(`DELETE FROM classes WHERE id = ?
       AND NOT EXISTS (SELECT 1 FROM users u WHERE u.class_id = classes.id AND u.active = 1)
-      AND NOT EXISTS (SELECT 1 FROM loans l WHERE l.class_id = classes.id AND l.returned_at IS NULL)`);
+      AND NOT EXISTS (SELECT 1 FROM loans l WHERE l.class_id = classes.id AND l.returned_at IS NULL)
+      AND NOT EXISTS (SELECT 1 FROM loans l JOIN users u ON u.id = l.user_id WHERE u.class_id = classes.id AND l.returned_at IS NULL)`);
     let n = 0;
     for (const id of body.ids ?? []) n += Number(del.run(Number(id)).changes);
     return { deleted: n };

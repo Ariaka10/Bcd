@@ -23,10 +23,12 @@ function reviewSummary(d) {
 
 function renderDetail(app, d) {
   if (state.user.role === 'eleve') return kidDetail(app, d);
+  const periodical = d.doc_type === 'periodique';
   const meta = [
     ['Auteur(s)', d.authors], ['Éditeur', d.publisher], ['Année', d.pub_year], ['Pages', d.pages],
     ['Collection', d.series ? d.series + (d.series_number ? ' n° ' + d.series_number : '') : ''],
     ['Type', typeLabel(d.doc_type)], ['Mots-clés', d.keywords], ['Sujets', d.subjects], ['Public', d.audience], ['Dewey', d.dewey],
+    ['Périodicité', d.periodicity], ['Abonnement jusqu\'au', d.subscription_end ? fmtDate(d.subscription_end) : ''],
     ['ISBN / EAN', d.isbn], ['Emplacement', d.location], ['Notes', d.notes], ['Prêts au total', d.loan_count],
   ].filter(([, v]) => v !== null && v !== undefined && v !== '');
 
@@ -61,10 +63,13 @@ function renderDetail(app, d) {
         <span class="muted small">${esc(r.class_name ?? '')} · le ${fmtDate(r.created_at)}</span> —
         ${r.status === 'prete' ? '<b>mis de côté, à lui remettre</b>' : 'en attente du retour'}
         <button class="btn btn-sm cancel-res" data-id="${r.id}" style="float:right">Annuler</button></li>`).join('')}</ul></div>` : ''}
-    <div class="card"><div class="row"><h2 class="grow" style="margin:0">Exemplaires</h2>
-        <button class="btn btn-sm" id="add-copy">➕ Ajouter un exemplaire</button></div>
-      <div class="table-wrap" style="margin-top:.8rem"><table><thead><tr><th>N°</th><th>État</th><th>Acquis le</th><th>Situation</th><th></th></tr></thead>
+    <div class="card"><div class="row"><h2 class="grow" style="margin:0">${periodical ? 'Numéros du magazine' : 'Exemplaires'}</h2>
+        ${periodical && isAdmin() && d.copies.some((c) => c.issue_date) ? '<button class="btn btn-sm" id="purge-issues">🧹 Retirer les anciens numéros</button>' : ''}
+        <button class="btn btn-sm" id="add-copy">➕ ${periodical ? 'Ajouter un numéro' : 'Ajouter un exemplaire'}</button></div>
+      <div class="table-wrap" style="margin-top:.8rem"><table><thead><tr>${periodical ? '<th>Numéro</th><th>Parution</th>' : ''}
+        <th>N°</th><th>État</th><th>Acquis le</th><th>Situation</th><th></th></tr></thead>
       <tbody>${d.copies.map((c) => `<tr>
+        ${periodical ? `<td><b>${esc(c.issue_label ?? '—')}</b></td><td>${c.issue_date ? esc(monthLabel(c.issue_date)) : ''}</td>` : ''}
         <td><b class="copy-number">${esc(c.barcode)}</b></td>
         <td><select class="copy-state" data-id="${c.id}" style="width:auto">${Object.entries(STATES).map(([k, l]) =>
           `<option value="${k}" ${c.state === k ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
@@ -74,7 +79,7 @@ function renderDetail(app, d) {
           <span class="small ${c.due_at < today() ? 'badge badge-late' : 'muted'}">à rendre le ${fmtDate(c.due_at)}</span>`
           : '<span class="badge badge-ok">En rayon</span>'}</td>
         <td class="num">${isAdmin() && !c.loan_id ? `<button class="icon-btn del-copy" data-id="${c.id}" title="Supprimer l'exemplaire">🗑️</button>` : ''}</td>
-      </tr>`).join('') || '<tr><td colspan="5" class="muted">Aucun exemplaire</td></tr>'}</tbody></table></div></div>`;
+      </tr>`).join('') || `<tr><td colspan="7" class="muted">${periodical ? 'Aucun numéro : ajoutez le dernier reçu.' : 'Aucun exemplaire'}</td></tr>`}</tbody></table></div></div>`;
 
   $('#to-list').onclick = () => addToListDialog([d.id]);
   $('#reserve').onclick = () => reserveDialog(d);
@@ -104,7 +109,9 @@ function renderDetail(app, d) {
     if (!(await confirmBox(`Supprimer « ${d.title} » et ses ${d.copies.length} exemplaire(s) ?`, { ok: 'Supprimer', danger: true }))) return;
     try { await api.del(`/documents/${d.id}`); toast('Document supprimé'); navigate('#/catalogue'); } catch (e) { toast(e.message, 'error'); }
   };
+  if ($('#purge-issues')) $('#purge-issues').onclick = () => purgeIssues(d);
   $('#add-copy').onclick = () => {
+    if (periodical) return addIssue(d);
     const dlg = modal('Ajouter des exemplaires', `<form class="grid" id="f">
       <label>Nombre d'exemplaires<input name="count" type="number" min="1" max="50" value="1" autofocus></label>
       <p class="muted small" style="margin:0">Chaque exemplaire reçoit automatiquement le numéro suivant (à écrire sur le livre).</p>
@@ -240,6 +247,9 @@ function renderForm(app, doc) {
         <div class="cote-field span-2"><label>Cote <input name="cote" id="cote" value="${esc(d.cote ?? '')}" placeholder="Calculée automatiquement"></label>
           <button type="button" class="btn" id="calc-cote" title="Recalculer la cote">🔁 Calculer</button></div>
         ${field('location', 'Emplacement', 'placeholder="Bac albums, étagère 3…"')}
+        <label class="periodical-only">Périodicité<select name="periodicity">${['', 'hebdomadaire', 'bimensuel', 'mensuel', 'bimestriel', 'trimestriel']
+          .map((p) => `<option value="${p}" ${d.periodicity === p ? 'selected' : ''}>${p || '—'}</option>`).join('')}</select></label>
+        ${field('subscription_end', 'Abonnement jusqu\'au', 'type="date"', 'periodical-only')}
         ${field('isbn', 'ISBN / EAN')}
         <label class="span-all">Résumé<textarea name="summary" rows="3">${esc(d.summary ?? '')}</textarea></label>
         <div class="span-2 cover-box"><div id="cover-preview">${cover(d, 'cover-md')}</div>
@@ -250,8 +260,9 @@ function renderForm(app, doc) {
             <details style="margin-top:.4rem"><summary class="small">Adresse web de l'image</summary>
               <input name="cover_url" value="${esc(d.cover_url ?? '')}" style="margin-top:.3rem"></details></div></div>
         <label class="span-2">Notes internes<input name="notes" value="${esc(d.notes ?? '')}"></label>
-        ${doc ? '' : `<label>Nombre d'exemplaires<input name="copies" type="number" min="0" max="50" value="1"></label>
-        <p class="span-2 muted small" style="align-self:end">Chaque exemplaire reçoit un numéro (1, 2, 3…) à écrire sur le livre.</p>`}
+        ${doc ? '' : `<label class="not-periodical">Nombre d'exemplaires<input name="copies" type="number" min="0" max="50" value="1"></label>
+        <p class="span-2 muted small not-periodical" style="align-self:end">Chaque exemplaire reçoit un numéro (1, 2, 3…) à écrire sur le livre.</p>
+        <p class="span-all muted small periodical-only">Après l'enregistrement, ajoutez les numéros du magazine depuis sa fiche (« ➕ Ajouter un numéro »).</p>`}
         <input type="hidden" name="source" value="${esc(d.source ?? '')}">
         <input type="hidden" name="source_url" value="${esc(d.source_url ?? '')}">
       </div>
@@ -261,6 +272,14 @@ function renderForm(app, doc) {
     </form>`;
 
   const form = $('#doc-form');
+  // Périodique : périodicité et abonnement ; les numéros s'ajoutent ensuite depuis sa fiche.
+  const syncType = () => {
+    const per = form.doc_type.value === 'periodique';
+    for (const el of $$('.periodical-only', form)) el.style.display = per ? '' : 'none';
+    for (const el of $$('.not-periodical', form)) el.style.display = per ? 'none' : '';
+  };
+  form.doc_type.addEventListener('change', syncType);
+  syncType();
 
   // Couverture choisie dans le formulaire : envoyée juste après l'enregistrement du livre.
   let pendingCover = null;
@@ -344,7 +363,7 @@ function renderForm(app, doc) {
     const data = formData(form);
     data.theme_ids = $$('.theme-cb', form).filter((cb) => cb.checked).map((cb) => Number(cb.value));
     const again = $('#again')?.checked;
-    if (data.copies !== undefined) data.copies = Number(data.copies);
+    if (data.copies !== undefined) data.copies = data.doc_type === 'periodique' ? 0 : Number(data.copies);
     try {
       if (doc) {
         await api.put(`/documents/${doc.id}`, data);
@@ -369,6 +388,58 @@ function renderForm(app, doc) {
         // Seulement si l'on est resté sur cette page (fermeture différée par le navigateur).
         dlg.addEventListener('close', () => { if (location.hash === here) navigate(next); });
       }
+    } catch (err) { toast(err.message, 'error'); }
+  };
+}
+
+/* ---------- Périodiques ---------- */
+
+function monthLabel(ym) {
+  const [y, m] = String(ym).split('-').map(Number);
+  if (!y || !m) return ym;
+  return new Date(y, m - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+}
+
+function addIssue(d) {
+  const now = new Date();
+  const last = d.copies.find((c) => c.issue_label);
+  // Mois proposé : celui qui suit le dernier numéro reçu (sinon le mois en cours).
+  const [ly, lm] = String(last?.issue_date ?? '').split('-').map(Number);
+  const next = ly && lm ? new Date(ly, lm, 1) : now;
+  const ym = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+  const guess = last?.issue_label?.match(/(\d+)/) ? last.issue_label.replace(/(\d+)/, (n) => String(Number(n) + 1)) : '';
+  const dlg = modal(`Nouveau numéro — ${d.title}`, `<form class="grid" id="f">
+    <label>Numéro du magazine<input name="issue_label" value="${esc(guess)}" placeholder="n° 412" required autofocus></label>
+    <label>Mois de parution<input name="issue_date" type="month" value="${ym}"></label>
+    <label>Nombre d'exemplaires de ce numéro<input name="count" type="number" min="1" max="20" value="1"></label>
+    <p class="muted small" style="margin:0">Chaque exemplaire reçoit un numéro BCD (1, 2, 3…) à écrire dessus, comme pour un livre.</p>
+    <div class="actions"><button type="button" class="btn" data-close>Annuler</button><button class="btn btn-primary">Ajouter</button></div></form>`);
+  $('#f', dlg).onsubmit = async (e) => {
+    e.preventDefault();
+    const f = formData(e.target);
+    try {
+      const r = await api.post(`/documents/${d.id}/copies`, { issue_label: f.issue_label, issue_date: f.issue_date, count: Number(f.count) });
+      dlg.close();
+      toast(`${f.issue_label} ajouté — n° BCD ${r.barcodes.join(', ')}`);
+      navigate(location.hash);
+    } catch (err) { toast(err.message, 'error'); }
+  };
+}
+
+function purgeIssues(d) {
+  const now = new Date();
+  const lastYear = `${now.getFullYear() - 1}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const dlg = modal('Retirer les anciens numéros', `<form class="grid" id="f">
+    <label>Retirer les numéros parus avant<input name="before" type="month" value="${lastYear}" required></label>
+    <p class="muted small" style="margin:0">Les numéros encore en prêt sont gardés.</p>
+    <div class="actions"><button type="button" class="btn" data-close>Annuler</button><button class="btn btn-danger">🧹 Retirer</button></div></form>`);
+  $('#f', dlg).onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const r = await api.post(`/documents/${d.id}/issues/purge`, { before: e.target.before.value });
+      dlg.close();
+      toast(`${plural(r.deleted, 'numéro retiré', 'numéros retirés')}`);
+      navigate(location.hash);
     } catch (err) { toast(err.message, 'error'); }
   };
 }

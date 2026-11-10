@@ -62,6 +62,8 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
   indice Dewey pour les documentaires (`590 LED`).
 - **Numéros d'exemplaire simples** (1, 2, 3…), affichés en grand à l'enregistrement pour les écrire sur le livre.
 - **Thèmes** (image, couleur, visibles ou non par les élèves) et **mots-clés**.
+- **Périodiques** : chaque magazine avec ses numéros (prêtables un par un), suivi de l'abonnement ;
+  type **Multimédia** pour les CD et DVD.
 - **Recherche** simple (sans se soucier des accents) et avancée ; **Tous les livres** : inventaire complet.
 - **Import d'un catalogue existant** : Hibouthèque (*Administration → Document → Export des documents en CSV*),
   BCDI, PMB, tableur. Colonnes reconnues automatiquement, aperçu avant import, numéros d'origine conservés.
@@ -71,8 +73,9 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
 - Comptoir **avec ou sans douchette** : numéro, titre ou ISBN du livre ; retour par numéro, titre ou nom de l'enfant.
 - **Prêt à toute une classe** (lot de livres), **réservations** (par un adulte ou « Je le veux ! » de l'élève),
   livre mis de côté au retour.
-- **Retards** par classe et **mots aux familles** imprimables ; **fin d'année** : listes par classe et date de retour commune.
-- **Élèves partis avec un livre** : signalés à l'import ONDE (« Rendu » / « Perdu »), rubrique dédiée avec mots pour les familles.
+- **Retards** par classe et **mots aux familles** imprimables (prénom de l'enfant, signés par l'enseignant·e, à découper) ; **fin d'année** : listes par classe et date de retour commune.
+- **Élèves partis avec un livre** : signalés à l'import ONDE (« Rendu » / « Perdu »), rubrique dédiée avec mots pour les familles,
+  et toujours en tête de « Ma classe » avec une alerte.
 - Durées et limites par profil, prolongations, déclaration de perte.
 
 ### Élèves et classes
@@ -83,7 +86,8 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
   **cartes de connexion** imprimables.
 - Espace élève pensé pour la maternelle : thèmes en gros boutons, couvertures, « Mes livres »,
   **avis en frimousses** et rayon « Coups de cœur ».
-- Profils **administrateur**, **enseignant**, **élève**.
+- Profils **administrateur**, **enseignant**, **élève**. Les adultes aussi se connectent par **cartes** :
+  un clic pour les enseignant·es (mot de passe facultatif, proposé à la première connexion), mot de passe pour l'administrateur.
 
 ### Sécurité des données
 - Les données restent **sur l'ordinateur** (`Documents\BCD`), rien n'est ouvert sur le réseau.

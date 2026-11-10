@@ -79,10 +79,14 @@ async function renderAccount(app) {
   app.innerHTML = `<div class="page-head"><h1>Mon compte</h1></div>
     <div class="card"><h2 style="margin-top:0">${u.role === 'eleve' ? 'Choisis ton avatar' : 'Mon avatar'}</h2>
       <div class="avatar-grid" id="avatars">${avatars.map((a) => `<button type="button" data-a="${a}" class="${a === u.avatar ? 'selected' : ''}">${a}</button>`).join('')}</div></div>
-    ${u.role !== 'eleve' ? `<form class="card grid" id="pwd" style="max-width:460px"><h2 style="margin-top:0">Changer de mot de passe</h2>
-      <label>Mot de passe actuel<input type="password" name="old_password" autocomplete="current-password" required></label>
-      <label>Nouveau mot de passe<input type="password" name="new_password" autocomplete="new-password" minlength="6" required></label>
-      <div class="actions"><button class="btn btn-primary">Changer</button></div></form>` : ''}`;
+    ${u.role !== 'eleve' ? `<form class="card grid" id="pwd" style="max-width:460px">
+      <h2 style="margin-top:0">${u.has_password ? '🔒 Mot de passe' : '🔓 Pas de mot de passe'}</h2>
+      ${u.has_password ? '' : '<p class="muted" style="margin:0">Votre carte ouvre votre compte d\'un simple clic. Vous pouvez la protéger par un mot de passe.</p>'}
+      ${u.has_password ? '<label>Mot de passe actuel<input type="password" name="old_password" autocomplete="current-password" required></label>' : ''}
+      <label>${u.has_password ? 'Nouveau mot de passe' : 'Mot de passe (6 caractères minimum)'}<input type="password" name="new_password" autocomplete="new-password" minlength="6" required></label>
+      <div class="actions">
+        ${u.has_password && u.role !== 'admin' ? '<button type="button" class="btn btn-ghost" id="remove-pwd" style="margin-right:auto">Retirer le mot de passe</button>' : ''}
+        <button class="btn btn-primary">${u.has_password ? 'Changer' : '🔒 Définir'}</button></div></form>` : ''}`;
   for (const b of $$('#avatars button')) {
     b.onclick = async () => {
       await api.put('/me/avatar', { avatar: b.dataset.a });
@@ -94,7 +98,23 @@ async function renderAccount(app) {
   const pwd = $('#pwd');
   if (pwd) pwd.onsubmit = async (e) => {
     e.preventDefault();
-    try { await api.put('/me/password', formData(pwd)); toast('Mot de passe changé'); pwd.reset(); } catch (err) { toast(err.message, 'error'); }
+    try {
+      await api.put('/me/password', formData(pwd));
+      toast(u.has_password ? 'Mot de passe changé' : 'Mot de passe défini 🔒');
+      state.user = (await api.get('/me')).user;
+      navigate(location.hash);
+    } catch (err) { toast(err.message, 'error'); }
+  };
+  const remove = $('#remove-pwd');
+  if (remove) remove.onclick = async () => {
+    const old = pwd.old_password.value;
+    if (!old) return toast('Tapez d\'abord votre mot de passe actuel', 'error');
+    try {
+      await api.put('/me/password', { old_password: old, remove: true });
+      toast('Mot de passe retiré : votre carte s\'ouvre d\'un clic');
+      state.user = (await api.get('/me')).user;
+      navigate(location.hash);
+    } catch (err) { toast(err.message, 'error'); }
   };
 }
 

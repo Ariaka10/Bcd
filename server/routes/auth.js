@@ -49,6 +49,24 @@ export default function (r) {
     return { ok: true, role: u.role };
   });
 
+  // Connexion des adultes par cartes : un clic pour les enseignant·es sans mot de passe,
+  // mot de passe toujours demandé pour l'administrateur.
+  r.get('/api/public/adults', ({ db }) => db.prepare(`
+    SELECT id, first_name, substr(last_name, 1, 1) AS initial, avatar, role,
+      (password_hash IS NOT NULL OR role = 'admin') AS needs_password
+    FROM users WHERE role != 'eleve' AND active = 1
+    ORDER BY role = 'admin', first_name, last_name`).all());
+
+  r.post('/api/login/carte', (ctx) => {
+    const u = ctx.db.prepare(`SELECT * FROM users WHERE id = ? AND role != 'eleve' AND active = 1`).get(ctx.body.user_id);
+    if (!u) throw new HttpError(404, 'Compte introuvable');
+    if (u.role === 'admin' || u.password_hash) {
+      if (!verifyPassword(ctx.body.password, u.password_hash)) throw new HttpError(401, 'Mot de passe incorrect');
+    }
+    openSession(ctx, u.id);
+    return { ok: true, role: u.role };
+  });
+
   // Connexion des élèves : classe → avatar → (code secret en pictogrammes si défini).
   r.get('/api/public/classes', ({ db }) => db.prepare(`
     SELECT c.id, c.name, c.level FROM classes c
@@ -78,12 +96,27 @@ export default function (r) {
     return { ok: true };
   });
 
-  r.get('/api/me', ({ user }) => ({ user }));
+  r.get('/api/me', ({ db, user }) => {
+    if (!user || user.role === 'eleve') return { user };
+    const u = db.prepare('SELECT password_hash, password_prompt_done FROM users WHERE id = ?').get(user.id);
+    // Enseignant·e sans mot de passe qui n'a pas encore répondu : on lui propose d'en définir un.
+    return { user: { ...user, has_password: Boolean(u.password_hash), ask_password: !u.password_hash && !u.password_prompt_done } };
+  });
+
+  r.post('/api/me/password-prompt', anyUser, ({ db, user }) => {
+    db.prepare('UPDATE users SET password_prompt_done = 1 WHERE id = ?').run(user.id);
+    return { ok: true };
+  });
 
   r.put('/api/me/password', anyUser, ({ db, user, body }) => {
     if (user.role === 'eleve') throw new HttpError(403, 'Non disponible');
     const u = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(user.id);
-    if (!verifyPassword(body.old_password, u.password_hash)) throw new HttpError(401, 'Mot de passe actuel incorrect');
+    // Sans mot de passe actuel (enseignant·e), on peut en définir un directement.
+    if (u.password_hash && !verifyPassword(body.old_password, u.password_hash)) throw new HttpError(401, 'Mot de passe actuel incorrect');
+    if (body.remove && user.role !== 'admin') {
+      db.prepare('UPDATE users SET password_hash = NULL, password_prompt_done = 1 WHERE id = ?').run(user.id);
+      return { ok: true };
+    }
     if (String(body.new_password ?? '').length < 6) throw new HttpError(400, '6 caractères minimum');
     db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(body.new_password), user.id);
     return { ok: true };

@@ -116,7 +116,7 @@ const TYPE_WORDS = [
   [/premi[eè]res? lectures?/, 'premiere_lecture'], [/album/, 'album'], [/bande|bd\b|comic/, 'bd'], [/manga/, 'manga'],
   [/roman/, 'roman'], [/conte/, 'conte'], [/po[eé]s|comptine/, 'poesie'], [/th[eé][aâ]tre/, 'theatre'],
   [/documentaire|doc\b|sciences?/, 'documentaire'], [/dictionnaire|encyclop/, 'reference'],
-  [/p[eé]riodique|revue|magazine|journal/, 'periodique'], [/cd|audio|disque/, 'audio'], [/dvd|vid[eé]o|film/, 'video'],
+  [/p[eé]riodique|revue|magazine|journal/, 'periodique'], [/multim[eé]dia|\bcd\b|audio|disque|\bdvd\b|vid[eé]o|film/, 'multimedia'],
   [/jeu/, 'jeu'],
 ];
 

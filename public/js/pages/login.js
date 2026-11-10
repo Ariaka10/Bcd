@@ -1,10 +1,39 @@
 import { api } from '../api.js';
-import { esc, toast, formData, $ } from '../ui.js';
+import { esc, toast, formData, modal, $, $$ } from '../ui.js';
 import { state, navigate } from '../state.js';
 
 async function afterLogin() {
   state.user = (await api.get('/me')).user;
   navigate('#/');
+}
+
+/** Première connexion d'un·e enseignant·e sans mot de passe : proposer d'en définir un (facultatif). */
+export function offerPassword() {
+  state.user.ask_password = false;
+  const dlg = modal('Protéger votre compte ?', `<form class="grid" id="f">
+    <p style="margin:0">Pour l'instant, n'importe qui peut ouvrir votre compte en cliquant sur votre carte.
+      Voulez-vous le protéger par un mot de passe ?</p>
+    <label>Mot de passe (6 caractères minimum)<input type="password" name="new_password" minlength="6" autocomplete="new-password"></label>
+    <label>Confirmer<input type="password" name="confirm" minlength="6" autocomplete="new-password"></label>
+    <p class="muted small" style="margin:0">Vous pourrez le modifier ou le retirer plus tard dans « Mon compte ».</p>
+    <div class="actions"><button type="button" class="btn" id="no">Non merci</button>
+      <button class="btn btn-primary">🔒 Définir ce mot de passe</button></div></form>`);
+  $('#no', dlg).onclick = async () => {
+    await api.post('/me/password-prompt');
+    dlg.close();
+  };
+  $('#f', dlg).onsubmit = async (e) => {
+    e.preventDefault();
+    const f = formData(e.target);
+    if (f.new_password.length < 6) return toast('6 caractères minimum', 'error');
+    if (f.new_password !== f.confirm) return toast('Les deux mots de passe sont différents', 'error');
+    try {
+      await api.put('/me/password', { new_password: f.new_password });
+      await api.post('/me/password-prompt');
+      dlg.close();
+      toast('Mot de passe enregistré 🔒');
+    } catch (err) { toast(err.message, 'error'); }
+  };
 }
 
 export function renderSetup(app) {
@@ -49,14 +78,55 @@ function choose() {
   $('#go-adult').onclick = adult;
 }
 
-function adult() {
+/** Adultes : une carte par enseignant·e (un clic, ou mot de passe s'il en a un) et une carte administrateur. */
+async function adult() {
+  const adults = await api.get('/public/adults');
+  if (!adults.length) return adultForm();
+  $('#login-step').innerHTML = `<h2 style="text-align:center">Qui êtes-vous ?</h2>
+    <div class="kid-grid">${adults.map((a) => `<button class="kid-btn adult-btn ${a.role === 'admin' ? 'admin-card' : ''}" data-id="${a.id}"
+        data-pwd="${a.needs_password ? 1 : 0}" data-name="${esc(a.first_name)} ${esc(a.initial)}.">
+      <span class="avatar">${esc(a.avatar ?? '🙂')}</span><span>${esc(a.first_name)} ${esc(a.initial)}.</span>
+      <span class="small muted">${a.role === 'admin' ? '🔑 Administrateur' : a.needs_password ? '🔒 Enseignant·e' : 'Enseignant·e'}</span></button>`).join('')}</div>
+    <div class="actions" style="justify-content:center"><button class="btn btn-ghost" id="back">← Retour</button>
+      <button class="btn btn-ghost small" id="by-id">Se connecter avec un identifiant</button></div>`;
+  $('#back').onclick = choose;
+  $('#by-id').onclick = adultForm;
+  for (const b of $$('.adult-btn')) {
+    b.onclick = () => (b.dataset.pwd === '1' ? askAdultPassword(b) : loginCard(b.dataset.id));
+  }
+}
+
+async function loginCard(id, password) {
+  try {
+    await api.post('/login/carte', { user_id: Number(id), password });
+    await afterLogin();
+    return true;
+  } catch (err) {
+    toast(err.message, 'error');
+    return false;
+  }
+}
+
+function askAdultPassword(btn) {
+  const dlg = modal(btn.dataset.name, `<form class="grid" id="f">
+    <div style="text-align:center;font-size:3rem">${esc(btn.querySelector('.avatar').textContent)}</div>
+    <label>Mot de passe<input type="password" name="password" autocomplete="current-password" required autofocus></label>
+    <div class="actions"><button type="button" class="btn" data-close>Annuler</button><button class="btn btn-primary">Se connecter</button></div></form>`);
+  $('#f', dlg).onsubmit = async (e) => {
+    e.preventDefault();
+    if (await loginCard(btn.dataset.id, e.target.password.value)) dlg.close();
+    else e.target.password.select();
+  };
+}
+
+function adultForm() {
   $('#login-step').innerHTML = `<form class="card grid" id="adult" style="max-width:420px;margin:0 auto">
     <h2 style="margin-top:0">Connexion enseignant / administrateur</h2>
     <label>Identifiant <input name="username" autocomplete="username" required autofocus></label>
     <label>Mot de passe <input name="password" type="password" autocomplete="current-password" required></label>
     <div class="row row-end"><button type="button" class="btn btn-ghost" id="back">← Retour</button>
     <button class="btn btn-primary">Se connecter</button></div></form>`;
-  $('#back').onclick = choose;
+  $('#back').onclick = adult;
   $('#adult').onsubmit = async (e) => {
     e.preventDefault();
     try {

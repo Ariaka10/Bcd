@@ -7,7 +7,7 @@ import { toCsv } from '../csv.js';
 // Un prêt « classe » (l.class_id) est présenté comme un emprunteur « 📦 Classe X ».
 const LOAN_SELECT = `
   SELECT l.id, l.copy_id, l.document_id, l.user_id, l.loaned_at, l.due_at, l.returned_at, l.renewals, l.lost,
-    coalesce(d.title, l.doc_title) AS title, d.authors, d.cote, d.cover_url, c.barcode,
+    coalesce(d.title || coalesce(' — ' || c.issue_label, ''), l.doc_title) AS title, d.authors, d.cote, d.cover_url, c.barcode,
     l.class_id AS loan_class_id, l.class_id IS NOT NULL AS is_class_loan,
     CASE WHEN l.class_id IS NOT NULL THEN 'Classe' ELSE u.first_name END AS first_name,
     CASE WHEN l.class_id IS NOT NULL THEN cl.name ELSE u.last_name END AS last_name,
@@ -114,6 +114,7 @@ export function createLoan(db, { user_id, class_id, barcode, copy_id, loaned_by,
     }
 
     const doc = db.prepare('SELECT id, title FROM documents WHERE id = ?').get(copy.document_id);
+    if (copy.issue_label) doc.title = `${doc.title} — ${copy.issue_label}`; // numéro de périodique
     const due = addDays(today, Number(s[`loan_days_${role}`] ?? 14));
     const { lastInsertRowid } = db.prepare(`INSERT INTO loans (copy_id, document_id, doc_title, user_id, class_id, loaned_at, due_at, loaned_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(copy.id, doc.id, doc.title, user?.id ?? null, cls?.id ?? null, nowIso(), due, loaned_by ?? null);
@@ -248,7 +249,8 @@ export default function (r) {
   r.get('/api/loans/find-copies', staff, ({ db, query }) => {
     const q = String(query.q ?? '').trim();
     if (!q) return [];
-    const select = `SELECT c.id AS copy_id, c.barcode, c.state, d.id AS document_id, d.title, d.authors, d.cote, d.cover_url,
+    const select = `SELECT c.id AS copy_id, c.barcode, c.state, d.id AS document_id,
+        d.title || coalesce(' — ' || c.issue_label, '') AS title, d.authors, d.cote, d.cover_url,
         ${ON_LOAN} AS on_loan,
         (SELECT u.first_name || ' ' || u.last_name FROM reservations rv JOIN users u ON u.id = rv.user_id
           WHERE rv.document_id = d.id AND rv.status = 'prete' ORDER BY rv.ready_at LIMIT 1) AS held_for

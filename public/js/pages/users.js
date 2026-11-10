@@ -31,7 +31,18 @@ async function renderList(app, query) {
     const mine = classes.find((c) => c.teacher_id === state.user.id);
     if (mine) query.class_id = String(mine.id);
   }
-  const users = await api.get('/users' + qs({ class_id: query.class_id, role: query.role, q: query.q, active: query.active }));
+  const classFilter = query.class_id && query.class_id !== 'none' ? query.class_id : undefined;
+  const [allUsers, departedLoans] = await Promise.all([
+    api.get('/users' + qs({ class_id: query.class_id, role: query.role, q: query.q, active: query.active })),
+    // Élèves partis qui ont encore un livre : toujours affichés en tête, quel que soit le filtre.
+    query.class_id === 'none' ? [] : api.get('/loans' + qs({ departed: '1', class_id: classFilter })),
+  ]);
+  const departed = new Map();
+  for (const l of departedLoans) {
+    if (!departed.has(l.user_id)) departed.set(l.user_id, { ...l, books: [] });
+    departed.get(l.user_id).books.push(l);
+  }
+  const users = allUsers.filter((u) => !departed.has(u.id));
   const selected = new Set();
 
   app.innerHTML = `<div class="page-head"><h1>Usagers</h1>
@@ -40,6 +51,9 @@ async function renderList(app, query) {
         <a class="btn" href="#/cartes${qs({ class_id: query.class_id })}">🪪 Cartes de connexion</a>
         <button class="btn btn-primary" id="add">➕ Nouvel usager</button></div></div>
     ${tabs('list')}
+    ${departed.size ? `<a class="card reminder alert-departed" href="#/prets?vue=partis">⚠️ <b>${plural(departed.size, 'élève parti', 'élèves partis')}
+      ${departed.size > 1 ? 'ont' : 'a'} encore ${plural(departedLoans.length, 'livre')} de la bibliothèque</b> : à récupérer
+      (mot pour la famille dans Prêts → Élèves partis).</a>` : ''}
     <form class="row card" id="filters" style="margin-bottom:1rem">
       <input name="q" value="${esc(query.q)}" placeholder="Rechercher un nom…" class="grow" style="max-width:280px">
       <select name="class_id" style="width:auto"><option value="">Toutes les classes</option>
@@ -51,9 +65,16 @@ async function renderList(app, query) {
         <option value="">Actifs</option><option value="0" ${query.active === '0' ? 'selected' : ''}>Archivés</option>
         <option value="all" ${query.active === 'all' ? 'selected' : ''}>Tous</option></select>
       <button class="btn">Filtrer</button><span class="muted">${plural(users.length, 'usager')}</span></form>
-    ${users.length ? `<div class="table-wrap"><table><thead><tr>
+    ${users.length || departed.size ? `<div class="table-wrap"><table><thead><tr>
       ${isAdmin() ? '<th><input type="checkbox" id="all"></th>' : ''}<th>Nom</th><th>Profil</th><th>Classe</th><th>Né(e) le</th><th class="num">Prêts</th><th></th></tr></thead>
-      <tbody>${users.map((u) => `<tr class="${u.active ? '' : 'muted'}">
+      <tbody>${[...departed.values()].map((d) => `<tr class="row-late">
+        ${isAdmin() ? '<td></td>' : ''}
+        <td><a href="#/usager/${d.user_id}" style="text-decoration:none">⚠️ <span class="avatar-sm">${esc(d.avatar)}</span>
+          <b>${esc(d.last_name)}</b> ${esc(d.first_name)}</a> <span class="badge badge-warn">parti — livre à récupérer</span>
+          <div class="small">${d.books.map((b) => `📖 ${esc(b.title)} <span class="muted">n° ${esc(b.barcode ?? '')}</span>`).join(' · ')}</div></td>
+        <td>Élève</td><td>${esc(d.class_name ?? '')}</td><td></td>
+        <td class="num"><span class="badge badge-late">${d.books.length}</span></td><td></td></tr>`).join('')}
+      ${users.map((u) => `<tr class="${u.active ? '' : 'muted'}">
         ${isAdmin() ? `<td><input type="checkbox" class="sel" value="${u.id}"></td>` : ''}
         <td><a href="#/usager/${u.id}" style="text-decoration:none"><span class="avatar-sm">${esc(u.avatar)}</span> <b>${esc(u.last_name)}</b> ${esc(u.first_name)}</a>
           ${u.has_code ? '<span title="Code secret défini">🔒</span>' : ''}${u.active ? '' : ' <span class="badge">archivé</span>'}</td>
@@ -109,8 +130,10 @@ async function editUser(u, classes, defaults = {}) {
       <label>Classe<select name="class_id"><option value="">—</option>${classes.map((c) =>
         `<option value="${c.id}" ${String(u.class_id) === String(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
       <label class="kid-only">Date de naissance<input type="date" name="birth_date" value="${esc(u.birth_date ?? '')}"></label>
-      <label class="adult-only">Identifiant de connexion<input name="username" value="${esc(u.username ?? '')}" autocomplete="off"></label>
-      <label class="adult-only">${isNew ? 'Mot de passe *' : 'Nouveau mot de passe'}<input name="password" type="password" autocomplete="new-password" minlength="6"></label>
+      <label class="adult-only">Identifiant <span class="muted small">— facultatif, créé automatiquement</span><input name="username" value="${esc(u.username ?? '')}" autocomplete="off"></label>
+      <label class="adult-only">${isNew ? 'Mot de passe' : 'Nouveau mot de passe'} <span class="muted small" id="pwd-hint"></span>
+        <input name="password" type="password" autocomplete="new-password" minlength="6"></label>
+      <label class="check adult-only teacher-only"><input type="checkbox" name="remove_password"> Retirer son mot de passe (connexion d'un clic sur sa carte)</label>
       <label class="check"><input type="checkbox" name="active" ${u.active ? 'checked' : ''}> Compte actif</label>
     </div>
     <div><b>Avatar</b><div class="avatar-grid" id="avatars" style="margin-top:.4rem">${av.map((a) =>
@@ -128,6 +151,10 @@ async function editUser(u, classes, defaults = {}) {
     const kid = form.role.value === 'eleve';
     for (const el of $$('.kid-only', dlg)) el.style.display = kid ? '' : 'none';
     for (const el of $$('.adult-only', dlg)) el.style.display = kid ? 'none' : '';
+    const teacher = form.role.value === 'enseignant';
+    for (const el of $$('.teacher-only', dlg)) el.style.display = teacher && !isNew ? '' : 'none';
+    $('#pwd-hint', dlg).textContent = form.role.value === 'admin' ? (isNew ? '— obligatoire' : '')
+      : '— facultatif : sans mot de passe, la carte s\'ouvre d\'un clic';
   };
   form.role.onchange = syncRole;
   syncRole();

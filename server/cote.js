@@ -17,8 +17,7 @@ export const DOC_TYPES = {
   documentaire: { label: 'Documentaire', prefix: null },
   reference: { label: 'Dictionnaire / encyclopédie', prefix: 'REF' },
   periodique: { label: 'Périodique', prefix: 'PER' },
-  audio: { label: 'CD / livre audio', prefix: 'CD' },
-  video: { label: 'DVD', prefix: 'DVD' },
+  multimedia: { label: 'Multimédia (CD, DVD…)', prefix: 'MM' },
   jeu: { label: 'Jeu', prefix: 'JEU' },
   autre: { label: 'Autre', prefix: 'DIV' },
 };

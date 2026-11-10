@@ -184,6 +184,9 @@ async function renderUser(app, id) {
       <div><h1 style="margin:0">${esc(u.first_name)} ${esc(u.last_name)}</h1>
       <span class="muted">${ROLES[u.role]}${u.class_name ? ' · ' + esc(u.class_name) : ''}${u.birth_date ? ' · né(e) le ' + fmtDate(u.birth_date) : ''}
       ${u.active ? '' : ' · <b>compte archivé</b>'}</span></div></div></div>
+    ${u.reservations?.length ? `<div class="card"><h2 style="margin-top:0">🔖 Réservations</h2><ul class="log">${u.reservations.map((r) =>
+      `<li class="${r.status === 'prete' ? 'warn' : ''}"><a href="#/document/${r.document_id}">${esc(r.title)}</a> —
+        ${r.status === 'prete' ? '<b>mis de côté, à lui remettre</b>' : 'en attente du retour'}</li>`).join('')}</ul></div>` : ''}
     <div class="card"><h2 style="margin-top:0">Prêts en cours (${u.loans.length})</h2>
       ${u.loans.length ? `<ul class="log">${u.loans.map((l) => `<li class="${l.overdue ? 'err' : ''}">
         <a href="#/document/${l.document_id}">${esc(l.title)}</a> <span class="cote small">${esc(l.cote ?? '')}</span>

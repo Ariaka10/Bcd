@@ -1,7 +1,7 @@
 {
   "name": "bcd",
   "productName": "BCD",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Gestion de BCD (bibliothèque centre documentaire) pour l'école primaire : catalogue, notices BnF par ISBN, prêts, usagers, import ONDE.",
   "author": "BCD",
   "type": "module",
@@ -43,9 +43,16 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
         }
       ],
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "artifactName": "BCD-${version}-sans-installation.${ext}"
     },
     "nsis": {
       "oneClick": true,

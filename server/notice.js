@@ -4,6 +4,7 @@
  * Sources de secours : Open Library puis Google Books.
  */
 import { toIsbn13, cleanIsbn } from './isbn.js';
+import { fixFields } from './text.js';
 
 const BNF_SRU = 'https://catalogue.bnf.fr/api/SRU';
 const TIMEOUT_MS = 8000;
@@ -189,6 +190,8 @@ export async function lookupIsbn(raw, sources = [fromBnf, fromOpenLibrary, fromG
     }
   }
   if (!notice) return { isbn, found: false, errors };
+  // Certaines sources (Open Library…) renvoient des accents abîmés : « kilomÃ¨tre » → « kilomètre ».
+  fixFields(notice, Object.keys(notice));
   notice.cover_url ||= `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg?default=false`;
   return { isbn, found: true, notice: { ...notice, isbn }, errors };
 }

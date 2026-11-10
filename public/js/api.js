@@ -1,7 +1,8 @@
 export class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, code) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -17,7 +18,7 @@ async function call(method, path, body) {
     if (res.status === 401 && !path.startsWith('/login') && location.hash !== '#/connexion') {
       location.hash = '#/connexion';
     }
-    throw new ApiError(res.status, data.error ?? `Erreur ${res.status}`);
+    throw new ApiError(res.status, data.error ?? `Erreur ${res.status}`, data.code);
   }
   return data;
 }

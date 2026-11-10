@@ -275,3 +275,66 @@ body[data-role=eleve] .nav a { font-size: 1.05rem; }
   .user-name { display: none; }
   .bar { grid-template-columns: 6rem 1fr 2rem; }
 }
+
+/* ---------- v1.1 : thèmes, avis, comptoir sans douchette ---------- */
+.chip {
+  --chip: #6b665d;
+  display: inline-flex; align-items: center; gap: .25rem; padding: .1rem .55rem; border-radius: 99px;
+  font-size: .8rem; font-weight: 600; white-space: nowrap; text-decoration: none;
+  color: var(--chip); background: color-mix(in srgb, var(--chip) 14%, #fff); border: 1px solid color-mix(in srgb, var(--chip) 35%, #fff);
+}
+.chip-lg { font-size: .95rem; padding: .3rem .8rem; }
+.chip.active, .chip-check:has(input:checked) { background: var(--chip); color: #fff; }
+.chip-check { cursor: pointer; font-weight: 600; }
+.chip-check input { width: auto; margin: 0; }
+.theme-bar { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .8rem; }
+.swatch { width: 2rem; height: 2rem; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+.swatch.selected { border-color: var(--text); }
+table.dense th, table.dense td { padding: .3rem .5rem; font-size: .9rem; }
+.copy-number { font-size: 1.1rem; }
+.stat-warn b { color: #b26b00; }
+.row-warn td { background: var(--warn-soft); }
+.update-banner {
+  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; justify-content: center;
+  padding: .5rem 1rem; background: var(--warn-soft); border-bottom: 1px solid var(--line);
+}
+.cover-sm { width: 32px; }
+.cover-sm .cover-fallback { font-size: .9rem; }
+.suggest button:disabled { opacity: .6; cursor: default; }
+.reviews { font-size: 1.1rem; display: flex; gap: .8rem; }
+
+/* Espace élève maternelle */
+.kid-themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .8rem; margin: 1rem 0; }
+.kid-themes button {
+  --chip: var(--accent);
+  display: grid; place-items: center; gap: .3rem; padding: 1rem .5rem; border-radius: 20px; cursor: pointer;
+  font: inherit; font-size: 1.15rem; font-weight: 700; color: var(--text);
+  background: color-mix(in srgb, var(--chip) 15%, #fff); border: 3px solid color-mix(in srgb, var(--chip) 45%, #fff);
+}
+.kid-themes button.active { background: var(--chip); color: #fff; border-color: var(--chip); }
+.kid-theme-emoji { font-size: 3rem; line-height: 1; }
+.kid-detail { display: flex; gap: 1.5rem; align-items: flex-start; }
+.cover-xl { width: 220px; }
+.cover-xl .cover-fallback { font-size: 4rem; }
+.big { font-size: 1.3rem; font-weight: 700; }
+.btn-xl { font-size: 1.5rem; padding: 1rem 2rem; border-radius: 18px; }
+.review-buttons { display: flex; gap: .8rem; flex-wrap: wrap; }
+.review-buttons button {
+  display: grid; place-items: center; gap: .2rem; min-width: 6rem; padding: .6rem; border-radius: 18px; cursor: pointer;
+  font: inherit; font-weight: 700; background: var(--surface); border: 3px solid var(--line);
+}
+.review-buttons button span { font-size: 3rem; line-height: 1; }
+.review-buttons button.selected, .mini-reviews button.selected { border-color: var(--accent); background: var(--warn-soft); }
+.mini-reviews { display: flex; gap: .3rem; justify-content: center; }
+.mini-reviews button { font-size: 1.6rem; padding: .15rem .3rem; border-radius: 10px; border: 2px solid transparent; background: none; cursor: pointer; }
+a.kid-loan { text-decoration: none; color: inherit; }
+
+@media print {
+  .print-page { break-after: page; }
+  .update-banner { display: none !important; }
+}
+@media (max-width: 860px) {
+  .kid-detail { flex-direction: column; align-items: center; text-align: center; }
+  .review-buttons { justify-content: center; }
+}
+.brand span:last-child { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; }

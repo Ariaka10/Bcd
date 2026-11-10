@@ -99,9 +99,9 @@ async function renderLabels(app) {
   const { items } = await api.get('/documents' + qs({ ids: ids.join(','), limit: 5000, sort: 'cote' }));
   const detail = await Promise.all(items.map((d) => api.get(`/documents/${d.id}`)));
   const labels = detail.flatMap((d) => (d.copies.length ? d.copies : [{ barcode: '' }]).map((c) => ({ ...d, barcode: c.barcode })));
-  app.innerHTML = `<div class="page-head no-print"><div><h1>Étiquettes de cote</h1>
+  app.innerHTML = `<div class="page-head no-print"><div><h1>Étiquettes</h1>
       <p class="muted">${plural(labels.length, 'étiquette')} (une par exemplaire). À imprimer sur planche d'étiquettes ou papier, puis découper.</p></div>
       <div class="row"><a href="javascript:history.back()" class="btn btn-ghost">← Retour</a><button class="btn btn-primary" onclick="window.print()">🖨️ Imprimer</button></div></div>
     <div class="labels-print">${labels.map((d) => `<div class="label"><b>${esc(d.cote ?? '')}</b>
-      <small>${esc(d.title)}</small><small>${esc(d.barcode)}</small></div>`).join('')}</div>`;
+      <small>${esc(d.title)}</small><small>${d.barcode ? `n° ${esc(d.barcode)}` : ""}</small></div>`).join('')}</div>`;
 }

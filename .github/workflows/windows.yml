@@ -57,15 +57,34 @@ jobs:
           if (-not $text.StartsWith('OK')) { throw "Échec du démarrage" }
           if (-not (Test-Path "$env:BCD_DATA_DIR\bcd.sqlite")) { throw "Base de données non créée" }
 
-      - name: Mettre l'installateur à disposition
+      - name: Tester la version zip (sans installation)
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist\BCD-*-sans-installation.zip | Select-Object -First 1
+          $dir = "$env:RUNNER_TEMP\bcd-zip"
+          Expand-Archive -Path $zip.FullName -DestinationPath $dir -Force
+          $result = "$env:RUNNER_TEMP\bcd-smoke-zip.txt"
+          $env:BCD_SMOKE_TEST = $result
+          $env:BCD_DATA_DIR = "$env:RUNNER_TEMP\bcd-data-zip"
+          $p = Start-Process -FilePath "$dir\BCD.exe" -PassThru
+          if (-not $p.WaitForExit(120000)) { $p.Kill(); throw "La version zip ne s'est pas fermée à temps" }
+          $text = Get-Content $result -Raw
+          Write-Host $text
+          if (-not $text.StartsWith('OK')) { throw "Échec du démarrage de la version zip" }
+
+      - name: Mettre les fichiers à disposition
         uses: actions/upload-artifact@v4
         with:
-          name: Installer-BCD
-          path: dist/Installer-BCD-*.exe
+          name: BCD-Windows
+          path: |
+            dist/Installer-BCD-*.exe
+            dist/BCD-*-sans-installation.zip
           retention-days: 30
 
       - name: Publier la version
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/Installer-BCD-*.exe
+          files: |
+            dist/Installer-BCD-*.exe
+            dist/BCD-*-sans-installation.zip

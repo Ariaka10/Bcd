@@ -5,12 +5,15 @@ import { computeCote, DOC_TYPES } from '../cote.js';
 import { toIsbn13, cleanIsbn } from '../isbn.js';
 import { lookupIsbn as defaultLookup } from '../notice.js';
 import { toCsv } from '../csv.js';
+import { fixMojibake, fixFields } from '../text.js';
+import { getSettings } from '../db.js';
 
 const DOC_FIELDS = [
   'isbn', 'title', 'subtitle', 'authors', 'publisher', 'pub_year', 'pages', 'series', 'series_number',
   'doc_type', 'dewey', 'subjects', 'summary', 'audience', 'cover_url', 'cote', 'location', 'notes',
-  'source', 'source_url',
+  'source', 'source_url', 'keywords',
 ];
+const TEXT_FIELDS = ['title', 'subtitle', 'authors', 'publisher', 'series', 'subjects', 'summary', 'keywords', 'audience'];
 const COPY_STATES = ['ok', 'abime', 'perdu', 'reparation'];
 
 const AVAILABLE_SQL = `(SELECT COUNT(*) FROM copies c WHERE c.document_id = d.id AND c.state IN ('ok', 'abime')
@@ -29,7 +32,8 @@ export function buildSearch(q) {
 
   if (q.q) {
     const all = `coalesce(d.title,'')||' '||coalesce(d.subtitle,'')||' '||coalesce(d.authors,'')||' '||coalesce(d.series,'')
-      ||' '||coalesce(d.subjects,'')||' '||coalesce(d.publisher,'')||' '||coalesce(d.cote,'')||' '||coalesce(d.isbn,'')`;
+      ||' '||coalesce(d.subjects,'')||' '||coalesce(d.publisher,'')||' '||coalesce(d.cote,'')||' '||coalesce(d.isbn,'')
+      ||' '||coalesce(d.keywords,'')`;
     for (const term of normalize(q.q).split(' ').filter(Boolean)) {
       const isbn = toIsbn13(term);
       if (isbn) { where.push('d.isbn = ?'); args.push(isbn); } else like(all, term);
@@ -38,6 +42,24 @@ export function buildSearch(q) {
   if (q.title) like(`coalesce(d.title,'')||' '||coalesce(d.subtitle,'')`, q.title);
   if (q.author) like('d.authors', q.author);
   if (q.subject) like('d.subjects', q.subject);
+  if (q.keyword) like(`coalesce(d.keywords,'')||' '||coalesce(d.subjects,'')`, q.keyword);
+  if (q.theme_id) {
+    where.push('d.id IN (SELECT document_id FROM document_themes WHERE theme_id = ?)');
+    args.push(Number(q.theme_id));
+  }
+  if (q.no_theme === '1') where.push('NOT EXISTS (SELECT 1 FROM document_themes x WHERE x.document_id = d.id)');
+  if (q.copy) {
+    where.push('d.id IN (SELECT document_id FROM copies WHERE barcode = ? COLLATE NOCASE)');
+    args.push(String(q.copy).trim());
+  }
+  if (q.state) {
+    where.push('d.id IN (SELECT document_id FROM copies WHERE state = ?)');
+    args.push(String(q.state));
+  }
+  // Élèves : seulement les livres des thèmes « visibles par les élèves », si l'option est active.
+  if (q.students_only) {
+    where.push(`d.id IN (SELECT dt.document_id FROM document_themes dt JOIN themes t ON t.id = dt.theme_id WHERE t.for_students = 1)`);
+  }
   if (q.publisher) like('d.publisher', q.publisher);
   if (q.series) like('d.series', q.series);
   if (q.summary) like('d.summary', q.summary);
@@ -65,6 +87,7 @@ export function buildSearch(q) {
 
 const SORTS = {
   title: 'norm(d.title)',
+  number: '(SELECT MIN(CAST(c.barcode AS INTEGER)) FROM copies c WHERE c.document_id = d.id), d.id',
   author: 'norm(d.authors), norm(d.title)',
   cote: 'd.cote, norm(d.title)',
   year: 'd.pub_year DESC, norm(d.title)',
@@ -79,8 +102,13 @@ export function searchDocuments(db, q) {
   const total = db.prepare(`SELECT COUNT(*) AS n FROM documents d ${sql}`).get(...args).n;
   const items = db.prepare(`
     SELECT d.id, d.isbn, d.title, d.subtitle, d.authors, d.publisher, d.pub_year, d.series, d.series_number,
-      d.doc_type, d.dewey, d.subjects, d.cote, d.cover_url, d.audience, d.location, d.created_at,
-      ${COPIES_SQL} AS copies_count, ${AVAILABLE_SQL} AS available_count
+      d.doc_type, d.dewey, d.subjects, d.cote, d.cover_url, d.audience, d.location, d.created_at, d.keywords,
+      ${COPIES_SQL} AS copies_count, ${AVAILABLE_SQL} AS available_count,
+      (SELECT group_concat(barcode, ', ') FROM (SELECT barcode FROM copies c WHERE c.document_id = d.id
+        ORDER BY CAST(barcode AS INTEGER), barcode)) AS numbers,
+      (SELECT group_concat(state) FROM copies c WHERE c.document_id = d.id) AS states,
+      (SELECT group_concat(theme_id) FROM document_themes x WHERE x.document_id = d.id) AS theme_ids,
+      (SELECT COUNT(*) FROM reviews r WHERE r.document_id = d.id AND r.rating = 3) AS loves
     FROM documents d ${sql} ORDER BY ${order} LIMIT ? OFFSET ?`).all(...args, limit, (page - 1) * limit);
   return { total, page, limit, items };
 }
@@ -94,20 +122,34 @@ function sanitizeDoc(body, existing = {}) {
   if (d.isbn) d.isbn = toIsbn13(d.isbn) ?? cleanIsbn(d.isbn);
   for (const f of ['pub_year', 'pages']) d[f] = d[f] == null || d[f] === '' ? null : Number(d[f]) || null;
   for (const f of DOC_FIELDS) if (typeof d[f] === 'string') d[f] = d[f].trim() || null;
+  fixFields(d, TEXT_FIELDS);
+  if (d.keywords) d.keywords = splitKeywords(d.keywords).join(' ; ') || null;
   if (!d.cote) d.cote = computeCote(d);
   return d;
 }
 
-/** Prochain code-barres libre : PRÉFIXE + numéro sur 6 chiffres. */
+export function splitKeywords(s) {
+  const seen = new Set();
+  return String(s ?? '').split(/[;,]/).map((k) => k.trim()).filter((k) => {
+    const n = normalize(k);
+    if (!n || seen.has(n)) return false;
+    seen.add(n);
+    return true;
+  });
+}
+
+/** Prochain numéro d'exemplaire libre : 1, 2, 3… dans l'ordre d'enregistrement. */
 export function nextBarcode(db) {
-  const prefix = db.prepare(`SELECT value FROM settings WHERE key = 'barcode_prefix'`).get()?.value ?? 'BCD';
-  const rows = db.prepare('SELECT barcode FROM copies WHERE barcode LIKE ?').all(prefix + '%');
-  let max = 0;
-  for (const { barcode } of rows) {
-    const n = Number(barcode.slice(prefix.length));
-    if (Number.isInteger(n) && n > max) max = n;
-  }
-  return prefix + String(max + 1).padStart(6, '0');
+  const max = db.prepare(`SELECT MAX(CAST(barcode AS INTEGER)) AS m FROM copies WHERE barcode GLOB '[0-9]*'`).get().m;
+  return String((max ?? 0) + 1);
+}
+
+/** Remplace les thèmes d'un document. */
+function setThemes(db, docId, themeIds) {
+  if (!Array.isArray(themeIds)) return;
+  db.prepare('DELETE FROM document_themes WHERE document_id = ?').run(docId);
+  const ins = db.prepare('INSERT OR IGNORE INTO document_themes (document_id, theme_id) SELECT ?, id FROM themes WHERE id = ?');
+  for (const t of themeIds) ins.run(docId, Number(t));
 }
 
 function addCopies(db, docId, { count = 1, barcodes = [] } = {}) {
@@ -115,7 +157,7 @@ function addCopies(db, docId, { count = 1, barcodes = [] } = {}) {
   const created = [];
   const list = barcodes.map((b) => String(b).trim()).filter(Boolean);
   for (const b of list) {
-    if (db.prepare('SELECT 1 FROM copies WHERE barcode = ?').get(b)) throw new HttpError(409, `Code-barres déjà utilisé : ${b}`);
+    if (db.prepare('SELECT 1 FROM copies WHERE barcode = ?').get(b)) throw new HttpError(409, `Numéro déjà utilisé : ${b}`);
     ins.run(docId, b); created.push(b);
   }
   for (let i = list.length; i < Math.min(Number(count) || 0, 50); i++) {
@@ -132,14 +174,33 @@ export function getDocument(db, id, user) {
   const isStaff = user && user.role !== 'eleve';
   d.copies = db.prepare(`
     SELECT c.id, c.barcode, c.state, c.acquired_at, c.notes,
-      l.id AS loan_id, l.due_at, l.loaned_at, l.user_id,
-      u.first_name || ' ' || u.last_name AS borrower, cl.name AS borrower_class
+      l.id AS loan_id, l.due_at, l.loaned_at, l.user_id, l.class_id AS loan_class_id,
+      coalesce(u.first_name || ' ' || u.last_name, '📦 Classe ' || lc.name) AS borrower,
+      coalesce(cl.name, lc.name) AS borrower_class,
+      (SELECT u2.first_name || ' ' || u2.last_name FROM reservations rv JOIN users u2 ON u2.id = rv.user_id
+        WHERE rv.document_id = c.document_id AND rv.status = 'prete' ORDER BY rv.ready_at LIMIT 1) AS held_for
     FROM copies c
     LEFT JOIN loans l ON l.copy_id = c.id AND l.returned_at IS NULL
     LEFT JOIN users u ON u.id = l.user_id
     LEFT JOIN classes cl ON cl.id = u.class_id
-    WHERE c.document_id = ? ORDER BY c.barcode`).all(id);
-  if (!isStaff) for (const c of d.copies) { delete c.borrower; delete c.borrower_class; delete c.user_id; delete c.loan_id; }
+    LEFT JOIN classes lc ON lc.id = l.class_id
+    WHERE c.document_id = ? ORDER BY CAST(c.barcode AS INTEGER), c.barcode`).all(id);
+  if (!isStaff) {
+    for (const c of d.copies) for (const k of ['borrower', 'borrower_class', 'user_id', 'loan_id', 'loan_class_id', 'held_for']) delete c[k];
+  }
+  d.themes = db.prepare(`SELECT t.id, t.name, t.emoji, t.color, t.for_students FROM themes t
+    JOIN document_themes x ON x.theme_id = t.id WHERE x.document_id = ? ORDER BY t.position, t.name`).all(id);
+  if (!isStaff) d.themes = d.themes.filter((t) => t.for_students);
+  d.reviews = Object.fromEntries([1, 2, 3].map((n) => [n, 0]));
+  for (const r of db.prepare('SELECT rating, COUNT(*) AS n FROM reviews WHERE document_id = ? GROUP BY rating').all(id)) d.reviews[r.rating] = r.n;
+  d.my_review = user ? db.prepare('SELECT rating FROM reviews WHERE document_id = ? AND user_id = ?').get(id, user.id)?.rating ?? null : null;
+  d.reservations = db.prepare(`SELECT rv.id, rv.user_id, rv.status, rv.created_at, u.first_name, u.last_name, u.avatar, c.name AS class_name
+    FROM reservations rv JOIN users u ON u.id = rv.user_id LEFT JOIN classes c ON c.id = u.class_id
+    WHERE rv.document_id = ? AND rv.status IN ('attente', 'prete') ORDER BY rv.created_at`).all(id);
+  if (!isStaff) {
+    d.reservations = d.reservations.filter((r) => r.user_id === user?.id);
+    d.on_loan_to_me = Boolean(db.prepare(`SELECT 1 FROM loans WHERE document_id = ? AND user_id = ? AND returned_at IS NULL`).get(id, user?.id));
+  }
   d.loan_count = db.prepare('SELECT COUNT(*) AS n FROM loans WHERE document_id = ?').get(id).n;
   d.lists = isStaff ? db.prepare(`SELECT l.id, l.name FROM lists l JOIN list_items i ON i.list_id = l.id
     WHERE i.document_id = ? ORDER BY l.name`).all(id) : [];
@@ -169,20 +230,57 @@ export default function (r, deps) {
 
   r.get('/api/meta', () => ({ doc_types: DOC_TYPES, copy_states: COPY_STATES }));
 
-  r.get('/api/documents', anyUser, ({ db, query }) => searchDocuments(db, query));
+  const restrictForStudent = (db, user) => user.role === 'eleve' && getSettings(db).restrict_student_catalog === '1';
+
+  r.get('/api/documents', anyUser, ({ db, query, user }) => {
+    const q = { ...query };
+    delete q.students_only;
+    if (restrictForStudent(db, user)) q.students_only = true;
+    return searchDocuments(db, q);
+  });
+
+  // Coups de cœur : livres les plus « adorés » par les élèves.
+  r.get('/api/coups-de-coeur', anyUser, ({ db, user }) => {
+    const restrict = restrictForStudent(db, user);
+    return db.prepare(`SELECT d.id, d.title, d.authors, d.cover_url, d.cote, COUNT(*) AS loves, ${AVAILABLE_SQL} AS available_count
+      FROM reviews r JOIN documents d ON d.id = r.document_id
+      WHERE r.rating = 3 ${restrict ? `AND d.id IN (SELECT dt.document_id FROM document_themes dt JOIN themes t ON t.id = dt.theme_id WHERE t.for_students = 1)` : ''}
+      GROUP BY d.id ORDER BY loves DESC, d.title LIMIT 12`).all();
+  });
+
+  r.post('/api/documents/:id/review', anyUser, ({ db, params, body, user }) => {
+    if (!db.prepare('SELECT 1 FROM documents WHERE id = ?').get(params.id)) throw new HttpError(404, 'Document introuvable');
+    const rating = Number(body.rating);
+    if (!rating) {
+      db.prepare('DELETE FROM reviews WHERE user_id = ? AND document_id = ?').run(user.id, params.id);
+      return { ok: true };
+    }
+    if (![1, 2, 3].includes(rating)) throw new HttpError(400, 'Avis invalide');
+    db.prepare(`INSERT INTO reviews (user_id, document_id, rating) VALUES (?, ?, ?)
+      ON CONFLICT(user_id, document_id) DO UPDATE SET rating = excluded.rating, created_at = datetime('now')`).run(user.id, params.id, rating);
+    return { ok: true };
+  });
 
   r.get('/api/documents/export.csv', staff, ({ db, query, res }) => {
     const { items } = searchDocuments(db, { ...query, limit: 5000 });
-    const rows = [['Cote', 'Titre', 'Auteurs', 'Éditeur', 'Année', 'Collection', 'Type', 'ISBN', 'Sujets', 'Exemplaires', 'Disponibles']];
+    const themes = new Map(db.prepare('SELECT id, name FROM themes').all().map((t) => [String(t.id), t.name]));
+    const rows = [['N° exemplaires', 'Cote', 'Titre', 'Auteurs', 'Éditeur', 'Année', 'Collection', 'Type', 'Thèmes', 'Mots-clés',
+      'ISBN', 'Sujets', 'Exemplaires', 'Disponibles']];
     for (const d of items) {
-      rows.push([d.cote, d.title, d.authors, d.publisher, d.pub_year, d.series, DOC_TYPES[d.doc_type]?.label,
-        d.isbn, d.subjects, d.copies_count, d.available_count]);
+      const th = String(d.theme_ids ?? '').split(',').filter(Boolean).map((t) => themes.get(t)).join(', ');
+      rows.push([d.numbers, d.cote, d.title, d.authors, d.publisher, d.pub_year, d.series, DOC_TYPES[d.doc_type]?.label, th,
+        d.keywords, d.isbn, d.subjects, d.copies_count, d.available_count]);
     }
-    res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="catalogue.csv"' });
+    res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="inventaire.csv"' });
     res.end(toCsv(rows));
   });
 
-  r.get('/api/documents/:id', anyUser, ({ db, params, user }) => getDocument(db, Number(params.id), user));
+  r.get('/api/documents/:id', anyUser, ({ db, params, user }) => {
+    if (restrictForStudent(db, user) && !searchDocuments(db, { ids: params.id, students_only: true }).total) {
+      throw new HttpError(404, 'Document introuvable');
+    }
+    return getDocument(db, Number(params.id), user);
+  });
 
   r.post('/api/documents', staff, ({ db, body }) => tx(db, () => {
     const d = sanitizeDoc(body);
@@ -190,6 +288,7 @@ export default function (r, deps) {
     const { lastInsertRowid } = db.prepare(`INSERT INTO documents (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`)
       .run(...cols.map((c) => d[c] ?? null));
     const id = Number(lastInsertRowid);
+    setThemes(db, id, body.theme_ids);
     const barcodes = addCopies(db, id, { count: body.copies ?? 1, barcodes: body.barcodes ?? [] });
     return { id, cote: d.cote, barcodes };
   }));
@@ -198,8 +297,11 @@ export default function (r, deps) {
     const existing = db.prepare('SELECT * FROM documents WHERE id = ?').get(params.id);
     if (!existing) throw new HttpError(404, 'Document introuvable');
     const d = sanitizeDoc(body, existing);
-    db.prepare(`UPDATE documents SET ${DOC_FIELDS.map((c) => `${c} = ?`).join(', ')}, updated_at = datetime('now') WHERE id = ?`)
-      .run(...DOC_FIELDS.map((c) => d[c] ?? null), existing.id);
+    tx(db, () => {
+      db.prepare(`UPDATE documents SET ${DOC_FIELDS.map((c) => `${c} = ?`).join(', ')}, updated_at = datetime('now') WHERE id = ?`)
+        .run(...DOC_FIELDS.map((c) => d[c] ?? null), existing.id);
+      setThemes(db, existing.id, body.theme_ids);
+    });
     return { id: existing.id, cote: d.cote };
   });
 

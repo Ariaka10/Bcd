@@ -9,8 +9,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from '../server/db.js';
 import { createApp } from '../server/app.js';
-import { autoBackup } from '../server/backup.js';
+import { autoBackup, backupFileName } from '../server/backup.js';
 import { setFetch } from '../server/notice.js';
+import { DatabaseSync } from 'node:sqlite';
+import { checkForUpdate, updateInfo, installUpdate } from './updater.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SMOKE_TEST = process.env.BCD_SMOKE_TEST; // chemin d'un fichier de résultat : test automatique
@@ -57,10 +59,17 @@ async function start() {
   dataDir = process.env.BCD_DATA_DIR ?? path.join(app.getPath('documents'), 'BCD');
   backupDir = path.join(dataDir, 'Sauvegardes');
   fs.mkdirSync(backupDir, { recursive: true });
-  db = openDb(path.join(dataDir, 'bcd.sqlite'));
+  const dbFile = path.join(dataDir, 'bcd.sqlite');
+  backupBeforeUpgrade(dbFile);
+  db = openDb(dbFile);
 
   setFetch((url, opts) => net.fetch(url, opts));
-  server = http.createServer(createApp(db, { backupDir }));
+  server = http.createServer(createApp(db, {
+    backupDir,
+    appInfo: updateInfo,
+    installUpdate,
+    checkUpdate: checkForUpdate,
+  }));
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', resolve); // 127.0.0.1 : inaccessible depuis le réseau
@@ -96,7 +105,29 @@ async function start() {
   win.on('closed', () => { win = null; });
 
   await win.loadURL(origin + '/');
-  if (SMOKE_TEST) await smokeTest(origin);
+  if (SMOKE_TEST) return smokeTest(origin);
+
+  // Nouvelle version ? Vérification au démarrage puis une fois par jour.
+  setTimeout(checkForUpdate, 5000);
+  setInterval(checkForUpdate, 24 * 3600 * 1000);
+}
+
+/**
+ * Premier lancement d'une nouvelle version : copie de sécurité de la base avant sa mise à niveau.
+ * (VACUUM INTO inclut aussi les dernières modifications pas encore écrites dans le fichier principal.)
+ */
+function backupBeforeUpgrade(dbFile) {
+  const versionFile = path.join(dataDir, 'version.txt');
+  const previous = fs.existsSync(versionFile) ? fs.readFileSync(versionFile, 'utf8').trim() : null;
+  if (fs.existsSync(dbFile) && previous !== app.getVersion()) {
+    const raw = new DatabaseSync(dbFile);
+    try {
+      raw.prepare('VACUUM INTO ?').run(path.join(backupDir, backupFileName(`bcd-avant-version-${app.getVersion()}`)));
+    } finally {
+      raw.close();
+    }
+  }
+  fs.writeFileSync(versionFile, app.getVersion());
 }
 
 async function smokeTest(origin) {

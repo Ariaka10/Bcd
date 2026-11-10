@@ -10,8 +10,7 @@ export async function render(app, { path }) {
     <form class="card" id="f">
       <h2 style="margin-top:0">École</h2>
       <div class="grid grid-2">
-        <label>Nom de l'école<input name="school_name" value="${esc(s.school_name)}"></label>
-        <label>Préfixe des codes-barres générés<input name="barcode_prefix" value="${esc(s.barcode_prefix)}"></label></div>
+        <label>Nom de l'école<input name="school_name" value="${esc(s.school_name)}"></label></div>
       <h2>Règles de prêt</h2>
       <div class="grid grid-3">
         ${num('loan_days_eleve', 'Durée de prêt élève (jours)')}
@@ -20,6 +19,8 @@ export async function render(app, { path }) {
         ${num('max_loans_eleve', 'Nombre de prêts max. élève')}
         ${num('max_loans_enseignant', 'Nombre de prêts max. enseignant')}
         ${num('max_loans_admin', 'Nombre de prêts max. administrateur')}
+        ${num('loan_days_classe', 'Durée de prêt à une classe (jours)')}
+        ${num('max_loans_classe', 'Nombre de livres max. prêtés à une classe')}
         ${num('max_renewals', 'Prolongations autorisées')}
         <label class="check span-2" style="align-self:end"><input type="checkbox" name="block_if_overdue" ${s.block_if_overdue === '1' ? 'checked' : ''}>
           Bloquer les nouveaux prêts tant qu'un livre est en retard</label></div>
@@ -27,9 +28,16 @@ export async function render(app, { path }) {
     <div class="card"><h2 style="margin-top:0">Entretien du catalogue</h2>
       <p class="muted">Recalcule la cote de tous les documents selon les règles automatiques (préfixe du genre ou indice Dewey + 3 lettres de l'auteur).
         Attention : les cotes saisies à la main seront remplacées.</p>
-      <button class="btn" id="recompute">🔁 Recalculer toutes les cotes</button></div>
-    <div class="card" id="backups"></div>`;
+      <button class="btn" id="recompute">🔁 Recalculer toutes les cotes</button>
+      <h3>Accents abîmés</h3>
+      <p class="muted">Certaines notices arrivent avec des accents illisibles (« kilomÃ¨tre » au lieu de « kilomètre »).
+        Elles sont maintenant corrigées automatiquement ; ce bouton répare celles déjà enregistrées.</p>
+      <button class="btn" id="repair">🩹 Chercher les textes à réparer</button>
+      <div id="repair-result"></div></div>
+    <div class="card" id="backups"></div>
+    <div class="card" id="version"></div>`;
   renderBackups();
+  renderVersion();
   $('#f').onsubmit = async (e) => {
     e.preventDefault();
     const data = formData(e.target);
@@ -42,6 +50,19 @@ export async function render(app, { path }) {
       toast('Paramètres enregistrés');
       navigate(location.hash);
     } catch (err) { toast(err.message, 'error'); }
+  };
+  $('#repair').onclick = async () => {
+    const { items } = await api.get('/admin/text-repair');
+    const box = $('#repair-result');
+    if (!items.length) { box.innerHTML = '<p class="badge badge-ok">✅ Aucun texte abîmé.</p>'; return; }
+    box.innerHTML = `<div class="table-wrap" style="margin-top:.6rem"><table class="dense"><thead><tr><th>Avant</th><th>Après</th></tr></thead>
+      <tbody>${items.slice(0, 100).map((i) => `<tr><td class="muted">${esc(i.before.slice(0, 120))}</td><td>${esc(i.after.slice(0, 120))}</td></tr>`).join('')}</tbody></table></div>
+      ${items.length > 100 ? `<p class="muted small">… et ${items.length - 100} autres.</p>` : ''}
+      <div class="actions"><button class="btn btn-primary" id="repair-go">🩹 Réparer ces ${items.length} textes</button></div>`;
+    $('#repair-go').onclick = async () => {
+      const r = await api.post('/admin/text-repair');
+      box.innerHTML = `<p class="badge badge-ok">✅ ${r.repaired} texte(s) réparé(s).</p>`;
+    };
   };
   $('#recompute').onclick = async () => {
     if (!confirm('Recalculer toutes les cotes ?')) return;
@@ -78,7 +99,8 @@ async function renderAccount(app) {
 /* ---------- Sauvegardes ---------- */
 
 const KINDS = { 'bcd-auto': 'automatique', 'bcd-manuelle': 'manuelle', 'bcd-avant-restauration': 'avant restauration' };
-const kindOf = (name) => KINDS[Object.keys(KINDS).find((k) => name.startsWith(k + '_'))] ?? '';
+const kindOf = (name) => (name.startsWith('bcd-avant-version') ? 'avant mise à jour'
+  : KINDS[Object.keys(KINDS).find((k) => name.startsWith(k + '_'))] ?? '');
 const WARN = 'Toutes les données actuelles seront remplacées par celles de la sauvegarde. Une copie de sécurité de l\'état actuel est faite avant.';
 
 function restored(r) {
@@ -128,4 +150,41 @@ async function renderBackups() {
       try { restored(await api.post(`/admin/backups/${encodeURIComponent(b.dataset.name)}/restore`)); } catch (err) { toast(err.message, 'error'); }
     };
   }
+}
+
+/* ---------- Version et mises à jour ---------- */
+
+async function renderVersion() {
+  const box = $('#version');
+  const info = await api.get('/app/info').catch(() => ({ desktop: false }));
+  if (!info.desktop) { box.remove(); return; }
+  const u = info.update;
+  box.innerHTML = `<h2 style="margin-top:0">🔄 Version et mises à jour</h2>
+    <p>Version installée : <b>${esc(info.version)}</b>${info.portable ? ' (version sans installation)' : ''}</p>
+    ${u?.version ? `<p>🎉 La version <b>${esc(u.version)}</b> est disponible.</p>`
+      : info.update_error ? `<p class="muted">Impossible de vérifier les mises à jour : ${esc(info.update_error)}</p>`
+      : '<p class="muted">Vous avez la dernière version.</p>'}
+    <div class="row">
+      ${u?.can_install ? '<button class="btn btn-primary" id="install">⬇️ Installer la mise à jour</button>' : ''}
+      <a class="btn" href="${esc(u?.url ?? info.releases_url)}" target="_blank" rel="noopener">🌐 Page de téléchargement (GitHub)</a>
+      <button class="btn" id="check">🔁 Vérifier maintenant</button></div>
+    <p class="small muted">L'application vérifie seule les nouvelles versions au démarrage. Si l'ordinateur bloque l'installation automatique,
+      téléchargez la nouvelle version depuis la page GitHub (installateur ou fichier zip).</p>`;
+  const install = $('#install');
+  if (install) install.onclick = async () => {
+    install.disabled = true;
+    install.textContent = 'Téléchargement…';
+    try {
+      await api.post('/app/install-update');
+      box.insertAdjacentHTML('beforeend', '<p class="badge badge-warn">⏳ Installation… l\'application va redémarrer.</p>');
+    } catch (e) {
+      toast(`${e.message} — utilisez la page de téléchargement`, 'error');
+      install.disabled = false;
+      install.textContent = 'Réessayer';
+    }
+  };
+  $('#check').onclick = async () => {
+    await api.post('/app/check-update').catch(() => {});
+    renderVersion();
+  };
 }

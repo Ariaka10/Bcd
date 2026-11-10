@@ -17,7 +17,7 @@ const NAV = {
   admin: [
     ['#/', '🏠', 'Accueil'], ['#/catalogue', '🔎', 'Catalogue'], ['#/document/nouveau', '➕', 'Ajouter'],
     ['#/prets', '📚', 'Prêts'], ['#/usagers', '👧', 'Usagers'], ['#/listes', '📋', 'Listes'],
-    ['#/desherbage', '🌿', 'Désherbage'], ['#/parametres', '⚙️', 'Paramètres'],
+    ['#/parametres', '⚙️', 'Paramètres'],
   ],
   enseignant: [
     ['#/', '🏠', 'Accueil'], ['#/catalogue', '🔎', 'Catalogue'], ['#/document/nouveau', '➕', 'Ajouter'],
@@ -31,6 +31,8 @@ const ROUTES = [
   [/^\/connexion$/, login, null],
   [/^\/$/, null, ['admin', 'enseignant', 'eleve']],
   [/^\/catalogue$/, catalogue, ['admin', 'enseignant']],
+  [/^\/inventaire$/, catalogue, ['admin', 'enseignant']],
+  [/^\/themes$/, catalogue, ['admin', 'enseignant']],
   [/^\/document\/nouveau$/, documentPage, ['admin', 'enseignant']],
   [/^\/document\/(\d+)$/, documentPage, ['admin', 'enseignant', 'eleve']],
   [/^\/document\/(\d+)\/modifier$/, documentPage, ['admin', 'enseignant']],
@@ -61,7 +63,8 @@ function renderNav() {
   document.body.dataset.role = u?.role ?? 'anon';
   $('#school-name').textContent = state.info?.school_name ?? 'BCD';
   if (!u) { nav.innerHTML = ''; $('#user-box').innerHTML = ''; return; }
-  const current = '#' + (location.hash.slice(1).split('?')[0] || '/');
+  let current = '#' + (location.hash.slice(1).split('?')[0] || '/');
+  if (['#/inventaire', '#/themes', '#/desherbage'].includes(current)) current = '#/catalogue';
   nav.innerHTML = NAV[u.role].map(([href, icon, label]) =>
     `<a href="${href}" class="${current === href ? 'active' : ''}"><span class="nav-icon">${icon}</span><span>${label}</span></a>`).join('');
   $('#user-box').innerHTML = `<a href="#/mon-compte" class="user-chip" title="Mon compte">
@@ -70,6 +73,8 @@ function renderNav() {
   $('#logout').onclick = async () => {
     await api.post('/logout');
     state.user = null;
+    state.settings = null;
+    $('#toasts').innerHTML = '';
     location.hash = '#/connexion';
   };
 }
@@ -99,6 +104,7 @@ async function route() {
   if (!roles && state.user && mod === login) { location.hash = '#/'; return; }
 
   renderNav();
+  checkUpdate();
   const params = path.match(re).slice(1);
   let page = mod;
   if (path === '/') page = state.user.role === 'eleve' ? eleve : home;
@@ -110,6 +116,37 @@ async function route() {
     console.error(e);
     if (id === renderId) app.innerHTML = `<div class="empty">⚠️ ${esc(e.message)}</div>`;
   }
+}
+
+/** Bandeau « nouvelle version disponible » (application Windows, administrateur). */
+async function checkUpdate() {
+  if (state.user?.role !== 'admin' || document.getElementById('update-banner')) return;
+  let info;
+  try { info = await api.get('/app/info'); } catch { return; }
+  const u = info.update;
+  if (!info.desktop || !u?.version) return;
+  const bar = document.createElement('div');
+  bar.id = 'update-banner';
+  bar.className = 'update-banner no-print';
+  bar.innerHTML = `🎉 Nouvelle version <b>${esc(u.version)}</b> disponible (vous avez la ${esc(info.version)}).
+    ${u.can_install ? '<button class="btn btn-sm btn-primary" id="upd-install">Installer et redémarrer</button>' : ''}
+    <a class="btn btn-sm" href="${esc(u.url)}" target="_blank" rel="noopener">Télécharger depuis GitHub</a>
+    <button class="icon-btn" id="upd-close" aria-label="Fermer">✕</button>`;
+  document.querySelector('.topbar').after(bar);
+  bar.querySelector('#upd-close').onclick = () => bar.remove();
+  const inst = bar.querySelector('#upd-install');
+  if (inst) inst.onclick = async () => {
+    inst.disabled = true;
+    inst.textContent = 'Téléchargement…';
+    try {
+      await api.post('/app/install-update');
+      bar.innerHTML = '⏳ Installation de la mise à jour… L\'application va redémarrer.';
+    } catch (e) {
+      toast(`${e.message} — utilisez « Télécharger depuis GitHub »`, 'error');
+      inst.disabled = false;
+      inst.textContent = 'Réessayer';
+    }
+  };
 }
 
 async function start() {

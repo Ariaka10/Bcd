@@ -5,7 +5,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { HttpError } from './util.js';
 
 // Ordre sans importance : les clés étrangères sont désactivées pendant la restauration.
-const TABLES = ['settings', 'classes', 'users', 'documents', 'copies', 'loans', 'lists', 'list_items'];
+const TABLES = ['settings', 'classes', 'users', 'documents', 'copies', 'loans', 'lists', 'list_items',
+  'themes', 'document_themes', 'reviews', 'reservations'];
 
 function stamp(d = new Date()) {
   const p = (n) => String(n).padStart(2, '0');

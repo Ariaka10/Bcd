@@ -3,14 +3,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { HttpError, localDate, randomToken } from '../util.js';
 import { getSettings, DEFAULT_SETTINGS, ensureDefaults } from '../db.js';
-import { staff, admin } from '../guards.js';
+import { staff, admin, anyUser } from '../guards.js';
+import { fixMojibake, hasMojibake } from '../text.js';
 import { snapshot, backupFileName, autoBackup, listBackups, restoreFrom } from '../backup.js';
 
 function tempFile() {
   return path.join(os.tmpdir(), `bcd-${randomToken().slice(0, 12)}.sqlite`);
 }
 
-export default function (r, { backupDir } = {}) {
+export default function (r, { backupDir, appInfo, installUpdate, checkUpdate } = {}) {
   // Téléchargement d'une copie complète de la base.
   r.get('/api/admin/backup', admin, ({ db, res }) => {
     const tmp = snapshot(db, tempFile());
@@ -61,6 +62,52 @@ export default function (r, { backupDir } = {}) {
     }
   });
 
+  // Réparation des accents abîmés déjà enregistrés (aperçu puis application).
+  const REPAIRABLE = {
+    documents: ['title', 'subtitle', 'authors', 'publisher', 'series', 'subjects', 'summary', 'keywords', 'audience'],
+    users: ['first_name', 'last_name'],
+    classes: ['name'],
+    lists: ['name', 'description'],
+    themes: ['name'],
+  };
+  const findRepairs = (db) => {
+    const out = [];
+    for (const [table, fields] of Object.entries(REPAIRABLE)) {
+      for (const row of db.prepare(`SELECT id, ${fields.join(', ')} FROM ${table}`).all()) {
+        for (const f of fields) {
+          if (!hasMojibake(row[f])) continue;
+          const after = fixMojibake(row[f]);
+          if (after !== row[f]) out.push({ table, id: row.id, field: f, before: row[f], after });
+        }
+      }
+    }
+    return out;
+  };
+  r.get('/api/admin/text-repair', admin, ({ db }) => ({ items: findRepairs(db) }));
+  r.post('/api/admin/text-repair', admin, ({ db }) => {
+    const items = findRepairs(db);
+    db.exec('BEGIN');
+    try {
+      for (const i of items) db.prepare(`UPDATE ${i.table} SET ${i.field} = ? WHERE id = ?`).run(i.after, i.id);
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+    return { repaired: items.length };
+  });
+
+  // Version de l'application et mise à jour disponible (renseignées par l'application Windows).
+  r.get('/api/app/info', anyUser, () => appInfo?.() ?? { desktop: false });
+  r.post('/api/app/check-update', admin, async () => {
+    if (checkUpdate) await checkUpdate();
+    return appInfo?.() ?? { desktop: false };
+  });
+  r.post('/api/app/install-update', admin, async () => {
+    if (!installUpdate) throw new HttpError(400, 'Mise à jour automatique indisponible');
+    return installUpdate();
+  });
+
   r.get('/api/settings', staff, ({ db }) => getSettings(db));
 
   r.put('/api/settings', admin, ({ db, body }) => {
@@ -90,9 +137,10 @@ export default function (r, { backupDir } = {}) {
       by_type: db.prepare('SELECT doc_type, COUNT(*) AS n FROM documents GROUP BY doc_type ORDER BY n DESC').all(),
       top_documents: db.prepare(`SELECT d.id, d.title, d.cote, COUNT(*) AS n FROM loans l JOIN documents d ON d.id = l.document_id
         WHERE l.loaned_at >= ? GROUP BY d.id ORDER BY n DESC LIMIT 10`).all(schoolYearStart),
-      by_class: db.prepare(`SELECT c.name, COUNT(l.id) AS n FROM classes c
-        LEFT JOIN users u ON u.class_id = c.id LEFT JOIN loans l ON l.user_id = u.id AND l.loaned_at >= ?
-        GROUP BY c.id ORDER BY c.name`).all(schoolYearStart),
+      by_class: db.prepare(`SELECT c.name, (SELECT COUNT(*) FROM loans l LEFT JOIN users u ON u.id = l.user_id
+          WHERE coalesce(l.class_id, u.class_id) = c.id AND l.loaned_at >= ?) AS n
+        FROM classes c ORDER BY c.name`).all(schoolYearStart),
+      reservations: one(`SELECT COUNT(*) AS n FROM reservations WHERE status = 'prete'`),
       recent: db.prepare(`SELECT id, title, cote, cover_url FROM documents ORDER BY created_at DESC, id DESC LIMIT 8`).all(),
     };
   });

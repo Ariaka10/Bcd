@@ -5,9 +5,14 @@ catalogue, notices BnF par ISBN, prêts, usagers, import ONDE, parcours adaptés
 
 ## Application Windows (recommandé)
 
-Un installateur `Installer-BCD-x.y.z.exe` est fabriqué automatiquement par GitHub à chaque modification
+Deux fichiers sont fabriqués (et testés sur Windows) automatiquement par GitHub à chaque modification
 (onglet **Actions** → dernière exécution « Application Windows » → rubrique **Artifacts**,
-ou onglet **Releases** pour les versions publiées).
+ou onglet **Releases** pour les versions publiées) :
+
+- `Installer-BCD-x.y.z.exe` : l'installateur (recommandé) ;
+- `BCD-x.y.z-sans-installation.zip` : la même application sans installation. On dézippe le dossier
+  où l'on veut (bureau, clé USB…) et on lance `BCD.exe`. Utile si l'ordinateur refuse les installateurs ;
+  un ordinateur qui interdit *tout* programme non approuvé la bloquera quand même.
 
 - **Installation** : double-clic sur l'installateur, sans droits administrateur. Une icône BCD apparaît sur le bureau.
   Windows peut afficher « Windows a protégé votre ordinateur » (application non signée) :
@@ -18,8 +23,13 @@ ou onglet **Releases** pour les versions publiées).
 - **Données** : `Documents\BCD\bcd.sqlite`.
 - **Sauvegardes** : automatiques à chaque fermeture (les 15 dernières, dans `Documents\BCD\Sauvegardes`),
   manuelles et restauration depuis *Paramètres → Sauvegardes*.
-- **Mise à jour** : lancer le nouvel installateur ; les données sont conservées.
-  La désinstallation (Paramètres Windows → Applications) ne supprime pas le dossier `Documents\BCD`.
+- **Mises à jour** : l'application vérifie au démarrage si une nouvelle version est publiée sur GitHub
+  (*Paramètres → Version et mises à jour*, et un bandeau pour l'administrateur). Version installée :
+  bouton « Installer et redémarrer ». Sinon, ou si l'ordinateur le bloque : lien vers la page de téléchargement.
+  Les données sont conservées, et une copie de sécurité est faite avant le premier lancement d'une nouvelle version.
+  ⚠️ La vérification automatique ne fonctionne que si le dépôt GitHub est **public** (sinon GitHub refuse l'accès
+  sans identifiant) ; avec un dépôt privé, on télécharge les nouvelles versions à la main depuis GitHub.
+- La désinstallation (Paramètres Windows → Applications) ne supprime pas le dossier `Documents\BCD`.
 
 Pour publier une version dans l'onglet *Releases* : changer `version` dans `package.json`,
 puis créer une étiquette `vX.Y.Z` (ex. `git tag v1.0.1 && git push --tags`).
@@ -43,13 +53,18 @@ Derrière un proxy (réseau académique…) : `NODE_USE_ENV_PROXY=1 HTTPS_PROXY=
 ## Fonctionnalités
 
 ### Gestion du fonds documentaire
-- **Recherche simple** (tous champs, sans tenir compte des accents) et **avancée** (titre, auteur, sujet, collection,
-  éditeur, ISBN, cote, type, années, public, emplacement, disponibilité, date d'ajout), tri et pagination.
-- **Notices prêtes à l'emploi par ISBN/EAN** : scan à la douchette → notice récupérée dans le catalogue de la **BnF**
+- **Recherche simple** (tous champs, sans tenir compte des accents) et **avancée** (titre, auteur, mot-clé, thème, sujet,
+  collection, éditeur, ISBN, cote, type, années, public, emplacement, disponibilité, date d'ajout), tri et pagination.
+- **Thèmes** créés par l'administrateur (nom, image, couleur) : filtre dans le catalogue, gros boutons pour les élèves,
+  option « les élèves ne voient que les thèmes visibles ». **Mots-clés** libres sur chaque livre.
+- **Tous les livres** : l'inventaire complet (numéros, cotes, thèmes, état, disponibilité), filtrable, imprimable,
+  exportable pour Excel.
+- **Notices prêtes à l'emploi par ISBN/EAN** : notice récupérée dans le catalogue de la **BnF**
   (API SRU, format UNIMARC), complétée si besoin par Open Library et Google Books (couverture, résumé).
-  Détection des doublons (« ajouter un exemplaire ? »).
-- **Ajout, modification, suppression** de documents et d'exemplaires (codes-barres générés automatiquement ou scannés),
-  état des exemplaires (bon, abîmé, perdu, en réparation).
+  Détection des doublons (« ajouter un exemplaire ? »). **Accents abîmés corrigés automatiquement**
+  (« kilomÃ¨tre » → « kilomètre »), avec un outil pour réparer les textes déjà enregistrés.
+- **Ajout, modification, suppression** de documents et d'exemplaires. Chaque exemplaire reçoit un **numéro simple**
+  (1, 2, 3… dans l'ordre d'enregistrement) à écrire sur le livre ; état (bon, abîmé, perdu, en réparation).
 - **Désherbage** : recherche des candidats (parus avant telle année, non empruntés depuis N ans, abîmés/perdus),
   impression de la liste pour vérifier en rayon, **suppression par lots**. Les documents en prêt sont protégés,
   l'historique des prêts est conservé.
@@ -61,15 +76,20 @@ Derrière un proxy (réseau académique…) : `NODE_USE_ENV_PROXY=1 HTTPS_PROXY=
   - documentaires : indice **Dewey** simplifié (repris de la notice BnF, ou deviné d'après les sujets) + auteur — `599 LED`.
 
 ### Prêts et usagers
-- **Comptoir de prêt** : choix de l'emprunteur (par nom ou en touchant l'avatar dans sa classe), scan du livre
-  (code-barres de l'exemplaire **ou ISBN**), retour en un scan. Limites et durées par profil, blocage en cas de retard,
-  prolongations, déclaration de perte.
+- **Comptoir de prêt sans douchette** : choix de l'emprunteur (par nom ou en touchant l'avatar dans sa classe),
+  puis le livre par son **numéro ou quelques lettres du titre** ; retour par numéro, titre ou nom de l'enfant.
+  Limites et durées par profil, blocage en cas de retard, prolongations, déclaration de perte.
+- **Prêt à une classe** : un lot de livres prêté à toute la classe (durée et nombre propres).
+- **Réservations** : par un adulte (« Réserver pour… ») ou par l'élève (« Je le veux ! ») ; au retour du livre,
+  l'application prévient qu'il faut le mettre de côté.
+- **Fin d'année** : listes « livres à rendre avant le … » par classe à imprimer, et date de retour commune pour tous les prêts.
 - **Retards** : liste par classe, **mots aux familles** imprimables, export CSV.
 - **Import des élèves depuis ONDE** (export CSV, encodage Windows ou UTF-8) ou tout fichier CSV :
   aperçu avant import, création des classes, changements de classe à la rentrée, archivage des élèves partis.
 - **Profils** : administrateur (tout), enseignant (prêts, catalogue, listes, élèves), élève.
 - **Parcours élève ludique** : connexion sans mot de passe (classe → avatar → code secret facultatif en pictogrammes),
-  40 **avatars** d'animaux au choix, recherche simplifiée avec couvertures et catégories, « Mes livres ».
+  40 **avatars** d'animaux au choix, thèmes en gros boutons, couvertures, « Mes livres ».
+- **Avis des élèves** en frimousses (😍 🙂 😐) et rayon « Coups de cœur de l'école ».
   **Cartes de connexion** imprimables par classe.
 
 ## Organisation du code

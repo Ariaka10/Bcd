@@ -197,7 +197,9 @@ export function currentSchoolYear(d = new Date()) {
 export function openDb(file) {
   if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
-  db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
+  // WAL + synchronous FULL : chaque modification est écrite sur le disque dès qu'elle est validée,
+  // une coupure de courant ne fait perdre au plus que l'opération en cours.
+  db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA foreign_keys = ON;');
   db.function('norm', { deterministic: true }, (s) => normalize(s));
   migrateSchema(db);
   db.exec(SCHEMA);

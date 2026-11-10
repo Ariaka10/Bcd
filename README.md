@@ -17,7 +17,7 @@ Gratuite, en français, sans abonnement, et les données restent sur l'ordinateu
 | 📚 **Catalogue** | Ajout d'un livre en tapant son ISBN : la fiche arrive de la **BnF**. Cote calculée automatiquement, numéro d'exemplaire simple (1, 2, 3…), couverture, thèmes, mots-clés. |
 | 🛎️ **Prêts** | Comptoir **sans douchette** : on touche l'avatar de l'enfant, on tape le numéro ou le titre du livre. Retards, réservations, prêt à toute une classe, fin d'année. |
 | 🧒 **Élèves** | Import depuis **ONDE**, connexion par **avatar** (sans mot de passe), thèmes en gros boutons, avis en frimousses 😍🙂😐. |
-| 💾 **Sécurité** | Sauvegarde à chaque fermeture, copie sur **clé USB**, assistant de rentrée. Rien n'est envoyé sur Internet (sauf l'ISBN pour trouver la notice). |
+| 💾 **Sécurité** | Sauvegarde toutes les 30 minutes et à chaque fermeture, copie sur **clé USB**, assistant de rentrée. Rien n'est envoyé sur Internet (sauf l'ISBN pour trouver la notice). |
 | 🪟 **Windows** | Un installateur, ou un **zip sans installation** pour les PC qui bloquent les installations. Rien d'autre à installer. |
 
 ## 📥 Télécharger et installer
@@ -85,7 +85,8 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
 
 ### Sécurité des données
 - Les données restent **sur l'ordinateur** (`Documents\BCD`), rien n'est ouvert sur le réseau.
-- **Sauvegarde automatique** à chaque fermeture (15 gardées), **copie sur clé USB**, restauration en un clic.
+- **Sauvegarde automatique** toutes les 30 minutes pendant l'utilisation et à chaque fermeture, **copie sur clé USB**,
+  restauration en un clic. Chaque modification est enregistrée immédiatement : une coupure de courant ne fait pas perdre la journée.
 - **Assistant de rentrée** : suppression des données des élèves partis (RGPD).
 - Copie de sécurité avant chaque mise à jour de l'application.
 

@@ -81,10 +81,33 @@ jobs:
             dist/BCD-*-sans-installation.zip
           retention-days: 30
 
+      - name: Préparer les notes de version (depuis le CHANGELOG)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const tag = process.env.GITHUB_REF_NAME.replace(/^v/, '');
+            const pkg = require('./package.json');
+            if (pkg.version !== tag) { console.error('Étiquette v' + tag + ' différente de la version du package.json (' + pkg.version + ')'); process.exit(1); }
+            const log = fs.readFileSync('CHANGELOG.md', 'utf8');
+            const start = log.indexOf('## [' + tag + ']');
+            if (start < 0) { console.error('Version ' + tag + ' absente du CHANGELOG'); process.exit(1); }
+            const next = log.indexOf('\n## [', start + 1);
+            const section = log.slice(start, next < 0 ? undefined : next).split('\n').slice(1).join('\n').trim();
+            const help = '\n\n---\n**Télécharger :** \`Installer-BCD-' + tag + '.exe\` (installation, sans droits administrateur) '
+              + 'ou \`BCD-' + tag + '-sans-installation.zip\` (à dézipper puis lancer BCD.exe).\n'
+              + 'Les données (Documents\\\\BCD) sont conservées lors de la mise à jour.';
+            fs.writeFileSync('release-notes.md', section + help);
+          "
+          cat release-notes.md
+
       - name: Publier la version
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          name: BCD ${{ github.ref_name }}
+          body_path: release-notes.md
           files: |
             dist/Installer-BCD-*.exe
             dist/BCD-*-sans-installation.zip

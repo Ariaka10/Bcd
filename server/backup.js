@@ -130,3 +130,25 @@ export function copyToExtraDir(db, dir) {
     ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(new Date().toISOString());
   return file;
 }
+
+/**
+ * Sauvegardes périodiques pendant l'utilisation : toutes les `minutes`, seulement si la base a changé
+ * depuis la dernière. Les `keep` plus récentes sont gardées (12 × 30 min = une journée de travail).
+ * Renvoie une fonction pour arrêter.
+ */
+export function startPeriodicBackups(db, dir, { minutes = 30, keep = 12, onError = console.error } = {}) {
+  const changes = () => db.prepare('SELECT total_changes() AS n').get().n;
+  let last = changes();
+  const timer = setInterval(() => {
+    try {
+      const now = changes();
+      if (now === last) return;
+      autoBackup(db, dir, { keep, prefix: 'bcd-periodique' });
+      last = now;
+    } catch (e) {
+      onError(e);
+    }
+  }, minutes * 60 * 1000);
+  timer.unref?.();
+  return () => clearInterval(timer);
+}

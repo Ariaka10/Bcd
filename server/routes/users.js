@@ -34,7 +34,8 @@ function cleanUser(body, existing = {}) {
   if (u.role === 'eleve') u.username = null;
   else {
     u.username = String(u.username ?? '').trim().toLowerCase() || null;
-    if (!u.username) throw new HttpError(400, 'Identifiant de connexion obligatoire pour un adulte');
+    // Identifiant facultatif (connexion par cartes) : créé à partir du prénom et du nom.
+    u.username ||= `${normalize(u.first_name)[0] ?? ''}${normalize(u.last_name).replace(/[^a-z0-9]/g, '')}` || null;
   }
   if ('secret_code' in body) {
     if (!body.secret_code) u.secret_code = null;
@@ -177,9 +178,13 @@ export default function (r) {
   r.post('/api/users', staff, ({ db, body, user }) => {
     const u = cleanUser({ role: 'eleve', ...body });
     if (user.role !== 'admin' && u.role !== 'eleve') throw new HttpError(403, 'Seul un administrateur peut créer un compte adulte');
-    if (u.role !== 'eleve' && String(body.password ?? '').length < 6) throw new HttpError(400, 'Mot de passe : 6 caractères minimum');
+    // Mot de passe obligatoire pour un administrateur, facultatif pour un·e enseignant·e.
+    if (u.role === 'admin' && String(body.password ?? '').length < 6) throw new HttpError(400, 'Mot de passe : 6 caractères minimum');
+    if (u.role === 'enseignant' && body.password && String(body.password).length < 6) throw new HttpError(400, 'Mot de passe : 6 caractères minimum');
+    let base = u.username;
+    for (let i = 2; u.username && db.prepare('SELECT 1 FROM users WHERE username = ?').get(u.username); i++) u.username = `${base}${i}`;
     const cols = [...USER_COLS, 'password_hash'];
-    u.password_hash = u.role !== 'eleve' ? hashPassword(body.password) : null;
+    u.password_hash = u.role !== 'eleve' && body.password ? hashPassword(body.password) : null;
     u.secret_code ??= null;
     const { lastInsertRowid } = db.prepare(`INSERT INTO users (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`)
       .run(...cols.map((c) => u[c] ?? null));
@@ -200,6 +205,12 @@ export default function (r) {
     if (body.password && u.role !== 'eleve') {
       if (String(body.password).length < 6) throw new HttpError(400, 'Mot de passe : 6 caractères minimum');
       db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(body.password), existing.id);
+    }
+    if (body.remove_password && u.role === 'enseignant') {
+      db.prepare('UPDATE users SET password_hash = NULL WHERE id = ?').run(existing.id);
+    }
+    if (u.role === 'admin' && !db.prepare('SELECT password_hash FROM users WHERE id = ?').get(existing.id).password_hash) {
+      throw new HttpError(400, 'Un administrateur doit avoir un mot de passe');
     }
     if (!u.active) db.prepare('DELETE FROM sessions WHERE user_id = ?').run(existing.id);
     return { ok: true };

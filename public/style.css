@@ -368,3 +368,18 @@ a.kid-loan { text-decoration: none; color: inherit; }
 .print-stage { background: #8f8a80; padding: 1.2rem; overflow: auto; flex: 1; min-height: 50vh; text-align: center; }
 .print-sheet { background: #fff; border: 0; box-shadow: 0 4px 18px rgba(0,0,0,.35); display: inline-block; max-width: none; }
 .modal-print .actions { padding: .6rem 1rem; margin: 0; border-top: 1px solid var(--line); }
+
+/* Mots aux familles : bandes à découper */
+.slips { max-width: 760px; margin: 0 auto; }
+.slip { background: var(--surface); padding: .8rem 1.2rem; break-inside: avoid; }
+.slip p { margin: .35rem 0; }
+.slip ul { margin: .3rem 0; }
+.slip-head { display: flex; justify-content: space-between; gap: 1rem; }
+.slip-sign { text-align: right; font-style: italic; }
+.cut-line { position: relative; border-top: 1px dashed #b8b2a7; margin: .6rem 0; height: 0; }
+.cut-line span { position: absolute; left: -.2rem; top: -.75rem; font-size: .9rem; color: #b8b2a7; background: var(--bg); padding: 0 .2rem; }
+@media print {
+  .slip { padding: 6mm 4mm; }
+  .cut-line { margin: 0; }
+  .cut-line span { background: #fff; }
+}

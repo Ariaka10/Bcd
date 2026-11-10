@@ -136,6 +136,8 @@ async function route() {
   try {
     await page.render(view, { path, params, query, isCurrent: () => id === renderId });
     if (id === renderId) window.scrollTo(0, 0);
+    // Enseignant·e sans mot de passe : proposition (une fois) une fois la page affichée.
+    if (id === renderId && state.user?.ask_password) login.offerPassword();
   } catch (e) {
     if (id !== renderId) return; // page abandonnée : erreur sans importance
     console.error(e);

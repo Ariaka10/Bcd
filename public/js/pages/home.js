@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { esc, cover, $ } from '../ui.js';
+import { esc, cover, fmtDate, $ } from '../ui.js';
 import { state, navigate, typeLabel } from '../state.js';
 
 export async function render(app) {
@@ -19,6 +19,9 @@ export async function render(app) {
     ${rem.extra_backup_days != null ? `<a class="card reminder" href="#/parametres">🔑 <b>Branchez la clé USB de sauvegarde</b> :
       ${rem.extra_backup_days < 0 ? 'aucune copie faite pour le moment' : `pas de copie depuis ${rem.extra_backup_days} jours`}.
       La copie se fait toute seule à la fermeture de l'application.</a>` : ''}
+    ${s.subscriptions?.length ? `<div class="card reminder">📰 <b>Abonnement${s.subscriptions.length > 1 ? 's' : ''} à renouveler :</b>
+      ${s.subscriptions.map((p) => `<a href="#/document/${p.id}">${esc(p.title)}</a> (${p.subscription_end < new Date().toISOString().slice(0, 10)
+        ? 'terminé le' : 'jusqu\'au'} ${fmtDate(p.subscription_end)})`).join(', ')}</div>` : ''}
     <form class="searchbar card" id="quick" style="margin-bottom:1rem">
       <input name="q" placeholder="Rechercher dans le catalogue : titre, auteur, sujet, ISBN, cote…" autofocus>
       <button class="btn btn-primary">Rechercher</button></form>

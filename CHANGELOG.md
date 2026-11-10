@@ -2,6 +2,25 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
+## [1.4.0] — 2026-11-11
+
+### Ajouté
+- **Connexion des adultes par cartes**, comme pour les élèves : une carte par enseignant·e (avatar, prénom),
+  connexion d'un clic. La carte **Administrateur** demande toujours le mot de passe.
+- **Mot de passe facultatif pour les enseignant·es** : à la première connexion, une fenêtre propose d'en définir un
+  (« Non merci » possible). Réglable ensuite dans *Mon compte* (définir, changer, retirer) ou par l'administrateur.
+  L'identifiant devient facultatif (créé automatiquement).
+- **Périodiques** : une fiche par magazine (périodicité, fin d'abonnement) et ses **numéros** en dessous
+  (« n° 412 — mars 2026 »), chacun prêtable avec son numéro BCD ; le numéro et le mois suivants sont proposés ;
+  retrait des anciens numéros en une fois ; rappel sur l'accueil quand un abonnement se termine.
+- **« Ma classe »** : alerte quand des élèves partis ont encore un livre, et ces élèves toujours **en tête du tableau**
+  (⚠️, ligne rouge pâle, titre du livre), quel que soit le filtre.
+
+### Modifié
+- **Mots aux familles** : prénom de l'enfant seulement, **signés par la personne connectée**, présentés en bandes
+  séparées par une **ligne de découpe** ✂.
+- **Type « Multimédia »** (cote `MM`) qui regroupe CD et DVD ; les documents existants sont convertis automatiquement.
+
 ## [1.3.2] — 2026-11-11
 
 ### Ajouté

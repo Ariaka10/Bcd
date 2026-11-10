@@ -326,16 +326,23 @@ function slips(loans) {
     if (!byUser.has(l.user_id)) byUser.set(l.user_id, []);
     byUser.get(l.user_id).push(l);
   }
-  return `<div class="grid grid-2">${[...byUser.values()].map((list) => {
+  // Signé par la personne connectée (l'enseignant·e qui imprime) ; prénom de l'enfant seulement.
+  const me = state.user;
+  const signature = `${me.first_name} ${me.last_name}`;
+  const today = new Date().toLocaleDateString('fr-FR');
+  return `<div class="slips">${[...byUser.values()].map((list) => {
     const u = list[0];
-    return `<div class="card" style="break-inside:avoid">
-      <p><b>${esc(state.info.school_name)} — Bibliothèque</b></p>
-      <p>Bonjour, <b>${esc(u.first_name)} ${esc(u.last_name)}</b>${u.class_name ? ` (${esc(u.class_name)})` : ''}
-        n'a pas encore rendu ${list.length > 1 ? 'les livres suivants' : 'le livre suivant'} :</p>
+    const many = list.length > 1;
+    return `<div class="slip">
+      <p class="slip-head"><b>${esc(state.info.school_name)} — Bibliothèque</b><span class="muted small">${today}</span></p>
+      <p>Bonjour,<br><b>${esc(u.first_name)}</b>${u.class_name ? ` <span class="muted">(${esc(u.class_name)})</span>` : ''}
+        n'a pas encore rendu ${many ? 'les livres suivants' : 'le livre suivant'} :</p>
       <ul>${list.map((l) => `<li><b>${esc(l.title)}</b> — à rendre le ${fmtDate(l.due_at)}</li>`).join('')}</ul>
-      <p class="small">Merci de bien vouloir ${list.length > 1 ? 'les' : 'le'} rapporter à l'école. Si le livre est perdu ou abîmé, prenez contact avec l'enseignant.</p>
+      <p class="small">Merci de bien vouloir ${many ? 'les' : 'le'} rapporter à l'école.
+        Si ${many ? 'un livre est perdu ou abîmé' : 'le livre est perdu ou abîmé'}, n'hésitez pas à nous en parler.</p>
+      <p class="slip-sign">${esc(signature)}</p>
     </div>`;
-  }).join('')}</div>`;
+  }).join('<div class="cut-line" aria-hidden="true"><span>✂</span></div>')}</div>`;
 }
 
 /* ---------- Réservations ---------- */

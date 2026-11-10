@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS users (
   ine TEXT,
   active INTEGER NOT NULL DEFAULT 1,
   archived_at TEXT,
+  -- 1 : l'adulte a répondu « non merci » à la proposition de mot de passe
+  password_prompt_done INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_users_class ON users(class_id);
@@ -80,6 +82,8 @@ CREATE TABLE IF NOT EXISTS documents (
   source TEXT,
   source_url TEXT,
   keywords TEXT,
+  periodicity TEXT,
+  subscription_end TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -91,7 +95,10 @@ CREATE TABLE IF NOT EXISTS copies (
   barcode TEXT NOT NULL UNIQUE,
   state TEXT NOT NULL DEFAULT 'ok' CHECK (state IN ('ok', 'abime', 'perdu', 'reparation')),
   acquired_at TEXT NOT NULL DEFAULT (date('now', 'localtime')),
-  notes TEXT
+  notes TEXT,
+  -- Périodiques : chaque exemplaire est un numéro du magazine (« n° 412 », parution « 2026-03 »)
+  issue_label TEXT,
+  issue_date TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_copies_doc ON copies(document_id);
 
@@ -232,6 +239,14 @@ const columns = (db, table) => db.prepare(`PRAGMA table_info(${table})`).all().m
 /** Met à niveau une base créée par une version précédente (avant création des nouvelles tables). */
 function migrateSchema(db) {
   const tables = new Set(db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all().map((t) => t.name));
+  const addColumn = (table, col, def) => {
+    if (tables.has(table) && !columns(db, table).includes(col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+  };
+  addColumn('copies', 'issue_label', 'TEXT');
+  addColumn('copies', 'issue_date', 'TEXT');
+  addColumn('documents', 'periodicity', 'TEXT');
+  addColumn('documents', 'subscription_end', 'TEXT');
+  addColumn('users', 'password_prompt_done', 'INTEGER NOT NULL DEFAULT 0');
   if (tables.has('users') && !columns(db, 'users').includes('archived_at')) {
     db.exec('ALTER TABLE users ADD COLUMN archived_at TEXT');
     db.exec(`UPDATE users SET archived_at = datetime('now') WHERE active = 0`);
@@ -270,6 +285,10 @@ export function ensureDefaults(db) {
   // (ou une mise à jour en cours d'année) n'a pas besoin de l'assistant avant la prochaine rentrée.
   ins.run('school_year_done', currentSchoolYear());
   db.exec('CREATE INDEX IF NOT EXISTS idx_loans_class ON loans(class_id)');
+  // v1.4 : les types « CD » et « DVD » sont regroupés dans « Multimédia » (cote MM).
+  db.exec(`UPDATE documents SET cote = 'MM' || substr(cote, CASE WHEN cote LIKE 'DVD%' THEN 4 ELSE 3 END)
+      WHERE doc_type IN ('audio', 'video') AND (cote LIKE 'CD%' OR cote LIKE 'DVD%');
+    UPDATE documents SET doc_type = 'multimedia' WHERE doc_type IN ('audio', 'video');`);
   // v1.1 : numéros d'exemplaire simples (1, 2, 3…) au lieu de « BCD000001 ».
   const old = db.prepare(`SELECT id, barcode FROM copies WHERE barcode GLOB 'BCD[0-9][0-9][0-9][0-9][0-9][0-9]'`).all();
   if (old.length) {

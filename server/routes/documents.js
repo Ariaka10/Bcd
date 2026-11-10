@@ -20,7 +20,7 @@ function imageType(buf) {
 const DOC_FIELDS = [
   'isbn', 'title', 'subtitle', 'authors', 'publisher', 'pub_year', 'pages', 'series', 'series_number',
   'doc_type', 'dewey', 'subjects', 'summary', 'audience', 'cover_url', 'cote', 'location', 'notes',
-  'source', 'source_url', 'keywords',
+  'source', 'source_url', 'keywords', 'periodicity', 'subscription_end',
 ];
 const TEXT_FIELDS = ['title', 'subtitle', 'authors', 'publisher', 'series', 'subjects', 'summary', 'keywords', 'audience'];
 const COPY_STATES = ['ok', 'abime', 'perdu', 'reparation'];
@@ -161,8 +161,9 @@ function setThemes(db, docId, themeIds) {
   for (const t of themeIds) ins.run(docId, Number(t));
 }
 
-function addCopies(db, docId, { count = 1, barcodes = [] } = {}) {
-  const ins = db.prepare('INSERT INTO copies (document_id, barcode) VALUES (?, ?)');
+function addCopies(db, docId, { count = 1, barcodes = [], issue_label = null, issue_date = null } = {}) {
+  const insert = db.prepare('INSERT INTO copies (document_id, barcode, issue_label, issue_date) VALUES (?, ?, ?, ?)');
+  const ins = { run: (doc, barcode) => insert.run(doc, barcode, issue_label || null, issue_date || null) };
   const created = [];
   const list = barcodes.map((b) => String(b).trim()).filter(Boolean);
   for (const b of list) {
@@ -182,7 +183,7 @@ export function getDocument(db, id, user) {
   if (!d) throw new HttpError(404, 'Document introuvable');
   const isStaff = user && user.role !== 'eleve';
   d.copies = db.prepare(`
-    SELECT c.id, c.barcode, c.state, c.acquired_at, c.notes,
+    SELECT c.id, c.barcode, c.state, c.acquired_at, c.notes, c.issue_label, c.issue_date,
       l.id AS loan_id, l.due_at, l.loaned_at, l.user_id, l.class_id AS loan_class_id,
       coalesce(u.first_name || ' ' || u.last_name, '📦 Classe ' || lc.name) AS borrower,
       coalesce(cl.name, lc.name) AS borrower_class,
@@ -193,7 +194,8 @@ export function getDocument(db, id, user) {
     LEFT JOIN users u ON u.id = l.user_id
     LEFT JOIN classes cl ON cl.id = u.class_id
     LEFT JOIN classes lc ON lc.id = l.class_id
-    WHERE c.document_id = ? ORDER BY CAST(c.barcode AS INTEGER), c.barcode`).all(id);
+    WHERE c.document_id = ?
+    ORDER BY c.issue_date DESC, CASE WHEN c.issue_label IS NULL THEN CAST(c.barcode AS INTEGER) ELSE -c.id END, c.barcode`).all(id);
   if (!isStaff) {
     for (const c of d.copies) for (const k of ['borrower', 'borrower_class', 'user_id', 'loan_id', 'loan_class_id', 'held_for']) delete c[k];
   }
@@ -402,7 +404,8 @@ export default function (r, deps) {
   // Exemplaires
   r.post('/api/documents/:id/copies', staff, ({ db, params, body }) => tx(db, () => {
     if (!db.prepare('SELECT 1 FROM documents WHERE id = ?').get(params.id)) throw new HttpError(404, 'Document introuvable');
-    return { barcodes: addCopies(db, Number(params.id), { count: body.count ?? (body.barcode ? 0 : 1), barcodes: body.barcode ? [body.barcode] : [] }) };
+    const issue = { issue_label: String(body.issue_label ?? '').trim() || null, issue_date: /^\d{4}-\d{2}(-\d{2})?$/.test(body.issue_date ?? '') ? body.issue_date : null };
+    return { barcodes: addCopies(db, Number(params.id), { count: body.count ?? (body.barcode ? 0 : 1), barcodes: body.barcode ? [body.barcode] : [], ...issue }) };
   }));
 
   r.get('/api/copies/by-barcode/:code', staff, ({ db, params }) => {
@@ -425,9 +428,18 @@ export default function (r, deps) {
     if (!COPY_STATES.includes(state)) throw new HttpError(400, 'État inconnu');
     const barcode = String(body.barcode ?? c.barcode).trim();
     if (!barcode) throw new HttpError(400, 'Numéro requis');
-    db.prepare('UPDATE copies SET state = ?, barcode = ?, notes = ? WHERE id = ?')
-      .run(state, barcode, body.notes ?? c.notes, c.id);
+    db.prepare('UPDATE copies SET state = ?, barcode = ?, notes = ?, issue_label = ?, issue_date = ? WHERE id = ?')
+      .run(state, barcode, body.notes ?? c.notes, 'issue_label' in body ? (String(body.issue_label ?? '').trim() || null) : c.issue_label,
+        'issue_date' in body ? (body.issue_date || null) : c.issue_date, c.id);
     return { ok: true };
+  });
+
+  // Périodiques : retirer d'un coup les anciens numéros (parus avant une date), sauf ceux en prêt.
+  r.post('/api/documents/:id/issues/purge', admin, ({ db, params, body }) => {
+    if (!/^\d{4}-\d{2}$/.test(body.before ?? '')) throw new HttpError(400, 'Date invalide');
+    const r2 = db.prepare(`DELETE FROM copies WHERE document_id = ? AND issue_date IS NOT NULL AND issue_date < ?
+      AND NOT EXISTS (SELECT 1 FROM loans l WHERE l.copy_id = copies.id AND l.returned_at IS NULL)`).run(params.id, body.before);
+    return { deleted: Number(r2.changes) };
   });
 
   r.delete('/api/copies/:id', admin, ({ db, params }) => {

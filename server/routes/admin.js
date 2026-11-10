@@ -248,6 +248,10 @@ export default function (r, { backupDir, appInfo, installUpdate, checkUpdate, ch
           WHERE coalesce(l.class_id, u.class_id) = c.id AND l.loaned_at >= ?) AS n
         FROM classes c ORDER BY c.name`).all(schoolYearStart),
       reservations: one(`SELECT COUNT(*) AS n FROM reservations WHERE status = 'prete'`),
+      // Abonnements de périodiques terminés ou qui se terminent dans le mois
+      subscriptions: db.prepare(`SELECT id, title, subscription_end FROM documents
+        WHERE doc_type = 'periodique' AND subscription_end IS NOT NULL AND subscription_end <= date('now', '+30 days')
+        ORDER BY subscription_end`).all(),
       departed_loans: one(`SELECT COUNT(*) AS n FROM loans l JOIN users u ON u.id = l.user_id
         WHERE l.returned_at IS NULL AND u.active = 0`),
       recent: db.prepare(`SELECT id, title, cote, cover_url FROM documents ORDER BY created_at DESC, id DESC LIMIT 8`).all(),

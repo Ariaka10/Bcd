@@ -5,6 +5,9 @@ Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeu
 ## [1.3.2] — 2026-11-11
 
 ### Ajouté
+- **Vignette des livres sans image** : l'icône de l'application (livre ouvert) avec la première lettre du titre
+  sur la page de gauche (« Le loup… » → « L » de loup).
+- Cote des documentaires : les saisons et la nature sont reconnues (indice Dewey 508).
 - **Aperçu avant impression** : chaque bouton « Imprimer » (et Ctrl+P) ouvre d'abord une fenêtre montrant la feuille
   telle qu'elle sortira (A4, portrait ou paysage), avec le bouton « Imprimer » en bas.
 - **Import ONDE : élèves qui partent avec un livre** signalés dans l'aperçu, avec des boutons « Rendu » / « Perdu »

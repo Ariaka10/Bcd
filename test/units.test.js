@@ -25,6 +25,7 @@ test('calcul des cotes', () => {
   assert.equal(firstAuthorSurname('Roald Dahl'), 'Dahl');
   assert.equal(guessDewey({ title: 'Mon entraînement' }), null);
   assert.equal(guessDewey({ subjects: 'Trains' }), '625');
+  assert.equal(guessDewey({ title: 'Le grand livre des saisons' }), '508');
 });
 
 test('import ONDE (CSV « ; », en-têtes officiels)', () => {

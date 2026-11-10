@@ -48,7 +48,7 @@ const DEWEY_KEYWORDS = [
   ['metier', '331'], ['ecole', '370'], ['fete', '394'], ['conte ', '398'], ['contes', '398'],
   ['anglais', '420'], ['grammaire', '440'], ['orthographe', '440'], ['langue francaise', '440'],
   ['mathemat', '510'], ['astronom', '520'], ['espace', '520'], ['planete', '520'], ['etoile', '520'],
-  ['physique', '530'], ['energie', '530'], ['electricite', '530'], ['chimie', '540'],
+  ['saison', '508'], ['nature', '508'], ['physique', '530'], ['energie', '530'], ['electricite', '530'], ['chimie', '540'],
   ['volcan', '551'], ['meteo', '551'], ['climat', '551'], ['ocean', '551'], ['geologie', '550'],
   ['ecologie', '577'], ['environnement', '577'], ['plante', '580'], ['arbre', '580'], ['fleur', '580'],
   ['insecte', '595'], ['poisson', '597'], ['oiseau', '598'], ['mammifere', '599'], ['animau', '590'], ['animal', '590'],

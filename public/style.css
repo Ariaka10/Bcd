@@ -149,7 +149,8 @@ td.num, th.num { text-align: right; }
 /* Couvertures */
 .cover { position: relative; width: 48px; aspect-ratio: 2 / 3; border-radius: 4px; overflow: hidden; flex-shrink: 0; background: var(--surface-2); }
 .cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.cover-fallback { position: absolute; inset: 0; display: grid; place-items: center; background: hsl(var(--h) 45% 82%); color: hsl(var(--h) 45% 28%); font-weight: 800; font-size: 1.2rem; }
+.cover-fallback { position: absolute; inset: 0; background: #2f6f5e; }
+.cover-fallback svg { display: block; width: 100%; height: 100%; }
 .cover-lg { width: 160px; }
 .cover-lg .cover-fallback { font-size: 3rem; }
 .cover-md { width: 100%; }

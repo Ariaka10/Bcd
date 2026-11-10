@@ -72,10 +72,34 @@ export function plural(n, one, many = one + 's') {
   return `${n} ${n > 1 ? many : one}`;
 }
 
+const TITLE_ARTICLES = new Set(['le', 'la', 'les', 'l', 'un', 'une', 'des', 'du', 'de', 'd']);
+
+/** Lettre affichée sur la vignette : celle du premier mot significatif (« Le loup… » → « L » de loup). */
+function coverLetter(title) {
+  const words = String(title ?? '').trim().split(/[\s'’]+/).filter(Boolean);
+  const word = words.find((w) => !TITLE_ARTICLES.has(w.toLowerCase())) ?? words[0] ?? '?';
+  return (word.match(/[\p{L}\p{N}]/u)?.[0] ?? '?').toUpperCase();
+}
+
+/** Vignette sans image : l'icône de l'application (livre ouvert), la lettre sur la page de gauche. */
+function coverFallback(title) {
+  return `<div class="cover-fallback"><svg viewBox="0 0 200 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <rect width="200" height="300" fill="#2f6f5e"/>
+    <g transform="translate(-28 18) scale(.5)">
+      <path d="M256 168 C 214 136 150 128 96 138 L 96 368 C 150 358 214 366 256 398 Z" fill="#fff"/>
+      <path d="M256 168 C 298 136 362 128 416 138 L 416 368 C 362 358 298 366 256 398 Z" fill="#f1eee6"/>
+      <path d="M256 168 L 256 398" stroke="#2f6f5e" stroke-width="6"/>
+      <g fill="none" stroke="#c9c2b2" stroke-width="10" stroke-linecap="round">
+        <path d="M286 200 C 312 188 344 184 380 190"/><path d="M286 240 C 312 228 344 224 380 230"/>
+        <path d="M286 280 C 312 268 344 264 380 270"/><path d="M286 320 C 312 308 344 304 380 310"/></g>
+      <path d="M330 120 L 370 120 L 370 214 L 350 196 L 330 214 Z" fill="#e9a23b"/>
+      <text x="176" y="318" text-anchor="middle" font-size="150" font-weight="800" fill="#2f6f5e"
+        font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">${esc(coverLetter(title))}</text>
+    </g></svg></div>`;
+}
+
 export function cover(doc, cls = '') {
-  const letter = esc((doc.title ?? '?').trim()[0] ?? '?');
-  const hue = [...String(doc.title ?? '')].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
-  const fallback = `<div class="cover-fallback" style="--h:${hue}"><span>${letter}</span></div>`;
+  const fallback = coverFallback(doc.title);
   if (!doc.cover_url) return `<div class="cover ${cls}">${fallback}</div>`;
   return `<div class="cover ${cls}">${fallback}<img src="${esc(doc.cover_url)}" alt="" loading="lazy"
     onload="if(this.naturalWidth<2)this.remove()" onerror="this.remove()"></div>`;

@@ -1,7 +1,8 @@
 import { api, qs } from '../api.js';
-import { esc, toast, confirmBox, fmtDate, plural, $, $$, debounce } from '../ui.js';
+import { esc, cover, toast, confirmBox, fmtDate, plural, $, $$, debounce } from '../ui.js';
 import { state, navigate } from '../state.js';
 
+// Emprunteur en cours au comptoir : { kind: 'user', ...usager } ou { kind: 'class', id, name, loans }
 let borrower = null;
 const log = [];
 
@@ -12,131 +13,212 @@ export async function render(app, { path, query }) {
       <a href="#/prets" class="${tab === 'desk' ? 'active' : ''}">🛎️ Comptoir</a>
       <a href="#/prets?vue=current" class="${tab === 'current' ? 'active' : ''}">📖 Prêts en cours</a>
       <a href="#/retards" class="${tab === 'late' ? 'active' : ''}">⏰ Retards</a>
+      <a href="#/prets?vue=reservations" class="${tab === 'reservations' ? 'active' : ''}">🔖 Réservations</a>
+      <a href="#/prets?vue=fin" class="${tab === 'fin' ? 'active' : ''}">☀️ Fin d'année</a>
       <a href="#/prets?vue=history" class="${tab === 'history' ? 'active' : ''}">🕓 Historique</a></div>
     <div id="tab"></div>`;
   const el = $('#tab');
   if (tab === 'desk') return desk(el);
   if (tab === 'late') return overdue(el, query);
+  if (tab === 'reservations') return reservations(el);
+  if (tab === 'fin') return endOfYear(el, query);
   return loanTable(el, query, tab);
 }
+
+const roleLabel = (r) => ({ admin: 'Administrateur', enseignant: 'Enseignant', eleve: 'Élève' }[r] ?? r);
 
 /* ---------- Comptoir ---------- */
 
 async function desk(el) {
   const classes = await api.get('/classes');
   el.innerHTML = `<div class="desk">
-    <section class="card"><h2 style="margin-top:0">📤 Emprunter</h2>
-      <label>1. Emprunteur
+    <section class="card"><h2 style="margin-top:0">📤 Prêter</h2>
+      <label>1. Qui emprunte ?
         <input id="who" placeholder="Nom ou prénom…" autocomplete="off"></label>
       <div id="who-suggest"></div>
       ${classes.length ? `<div class="row small" style="margin-top:.4rem"><span class="muted">ou par classe :</span>
         ${classes.map((c) => `<button class="btn btn-sm class-pick" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div>` : ''}
       <div id="borrower"></div>
-      <form id="loan-form" style="margin-top:.6rem">
-        <label>2. Scanner le livre (code-barres de l'exemplaire ou ISBN)
-          <input id="loan-code" class="scan-input" autocomplete="off" disabled placeholder="Choisissez d'abord l'emprunteur"></label></form>
+      <div id="book-step" hidden>
+        <label style="margin-top:.6rem">2. Quel livre ? <span class="muted small">— son numéro, ou quelques lettres du titre</span>
+          <input id="loan-code" class="scan-input" autocomplete="off" placeholder="Ex. : 12 ou « loup »"></label>
+        <div id="book-suggest"></div>
+      </div>
     </section>
     <section class="card"><h2 style="margin-top:0">📥 Rendre</h2>
-      <form id="return-form"><label>Scanner le livre rendu
-        <input id="return-code" class="scan-input" autocomplete="off" placeholder="Code-barres ou ISBN"></label></form>
+      <label>Numéro du livre, titre ou nom de l'enfant
+        <input id="return-code" class="scan-input" autocomplete="off" placeholder="Ex. : 12, « loup » ou « Léa »"></label>
+      <div id="return-suggest"></div>
       <h3>Opérations de la séance</h3>
       <ul class="log" id="log"></ul>
     </section></div>`;
 
+  // 1. Emprunteur
   const who = $('#who');
   const suggest = $('#who-suggest');
-  const search = debounce(async () => {
+  who.oninput = debounce(async () => {
     const q = who.value.trim();
     if (q.length < 2) { suggest.innerHTML = ''; return; }
     const users = await api.get('/users' + qs({ q, limit: 12 }));
     suggest.innerHTML = users.length ? `<div class="suggest">${users.map((u) => `<button type="button" data-id="${u.id}">
       <span class="avatar-sm">${esc(u.avatar)}</span><span class="grow">${esc(u.first_name)} ${esc(u.last_name)}</span>
       <span class="muted small">${esc(u.class_name ?? roleLabel(u.role))}</span></button>`).join('')}</div>` : '<p class="muted small">Personne trouvé.</p>';
-    for (const b of $$('button', suggest)) b.onclick = () => selectBorrower(b.dataset.id);
+    for (const b of $$('button', suggest)) b.onclick = () => selectUser(b.dataset.id);
   }, 200);
-  who.oninput = search;
   who.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('button', suggest)?.click(); } };
 
   for (const b of $$('.class-pick')) {
     b.onclick = async () => {
-      const users = await api.get('/users' + qs({ class_id: b.dataset.id, role: 'eleve' }));
+      const cls = classes.find((c) => c.id === Number(b.dataset.id));
+      const users = await api.get('/users' + qs({ class_id: cls.id, role: 'eleve' }));
       suggest.innerHTML = `<div class="kid-grid" style="grid-template-columns:repeat(auto-fill,minmax(110px,1fr));margin-top:.6rem">
+        <button type="button" class="kid-btn class-loan" style="font-size:.95rem;padding:.6rem .3rem;border-style:dashed">
+          <span class="avatar" style="font-size:2rem">📦</span>Toute la classe
+          ${cls.class_loans ? `<span class="badge">${cls.class_loans} 📖</span>` : ''}</button>
         ${users.map((u) => `<button type="button" class="kid-btn" data-id="${u.id}" style="font-size:.95rem;padding:.6rem .3rem">
           <span class="avatar" style="font-size:2rem">${esc(u.avatar)}</span>${esc(u.first_name)} ${esc(u.last_name[0] ?? '')}.
           ${u.active_loans ? `<span class="badge ${u.overdue_loans ? 'badge-late' : ''}">${u.active_loans} 📖</span>` : ''}</button>`).join('')}</div>`;
-      for (const k of $$('.kid-btn', suggest)) k.onclick = () => selectBorrower(k.dataset.id);
+      for (const k of $$('.kid-btn[data-id]', suggest)) k.onclick = () => selectUser(k.dataset.id);
+      $('.class-loan', suggest).onclick = () => selectClass(cls);
     };
   }
 
-  $('#loan-form').onsubmit = async (e) => {
+  // 2. Livre à prêter : numéro exact ou recherche par titre
+  const code = $('#loan-code');
+  const bookSuggest = $('#book-suggest');
+  const searchBooks = debounce(async () => {
+    const q = code.value.trim();
+    if (!q) { bookSuggest.innerHTML = ''; return; }
+    const copies = await api.get('/loans/find-copies' + qs({ q }));
+    bookSuggest.innerHTML = copies.length ? `<div class="suggest">${copies.map((c) => `<button type="button" data-copy="${c.copy_id}"
+        ${c.on_loan || !['ok', 'abime'].includes(c.state) ? 'disabled' : ''}>
+      ${cover(c, 'cover-sm')}<span class="grow"><b>${esc(c.title)}</b><br><span class="muted small">n° ${esc(c.barcode)} · ${esc(c.cote ?? '')}</span></span>
+      <span class="small">${c.on_loan ? '<span class="badge badge-late">déjà prêté</span>'
+        : !['ok', 'abime'].includes(c.state) ? '<span class="badge">indisponible</span>'
+        : c.held_for ? `<span class="badge badge-warn">gardé pour ${esc(c.held_for)}</span>` : '<span class="badge badge-ok">en rayon</span>'}</span></button>`).join('')}</div>`
+      : '<p class="muted small">Aucun livre trouvé.</p>';
+    for (const b of $$('button[data-copy]', bookSuggest)) b.onclick = () => lend({ copy_id: Number(b.dataset.copy) });
+  }, 200);
+  code.oninput = searchBooks;
+  code.onkeydown = (e) => {
+    if (e.key !== 'Enter') return;
     e.preventDefault();
-    const input = $('#loan-code');
-    const code = input.value.trim();
-    if (!code || !borrower) return;
-    input.value = '';
-    try {
-      const r = await api.post('/loans', { user_id: borrower.id, barcode: code });
-      addLog('ok', `📤 « ${r.title} » prêté à ${borrower.first_name} — retour le ${fmtDate(r.due_at)}`);
-      await selectBorrower(borrower.id, true);
-    } catch (err) {
-      addLog('err', `${code} : ${err.message}`);
-      toast(err.message, 'error');
-    }
-    input.focus();
+    const first = $('button[data-copy]:not([disabled])', bookSuggest);
+    if (/^\d+$/.test(code.value.trim())) lend({ barcode: code.value.trim() });
+    else first?.click();
   };
 
-  $('#return-form').onsubmit = async (e) => {
+  // Retour
+  const ret = $('#return-code');
+  const retSuggest = $('#return-suggest');
+  const searchReturns = debounce(async () => {
+    const q = ret.value.trim();
+    if (!q) { retSuggest.innerHTML = ''; return; }
+    const loans = await api.get('/loans' + qs({ q, limit: 20 }));
+    retSuggest.innerHTML = loans.length ? `<div class="suggest">${loans.map((l) => `<button type="button" data-loan="${l.id}">
+      ${cover(l, 'cover-sm')}<span class="grow"><b>${esc(l.title)}</b> <span class="muted small">n° ${esc(l.barcode ?? '')}</span><br>
+      <span class="small">${esc(l.avatar)} ${esc(l.first_name)} ${esc(l.last_name)}</span></span>
+      ${l.overdue ? `<span class="badge badge-late">+${l.days_late} j</span>` : ''}<span class="btn btn-sm">Rendre</span></button>`).join('')}</div>`
+      : '<p class="muted small">Aucun prêt en cours ne correspond.</p>';
+    for (const b of $$('button[data-loan]', retSuggest)) b.onclick = () => giveBack({ loan_id: Number(b.dataset.loan) });
+  }, 200);
+  ret.oninput = searchReturns;
+  ret.onkeydown = (e) => {
+    if (e.key !== 'Enter') return;
     e.preventDefault();
-    const input = $('#return-code');
-    const code = input.value.trim();
-    if (!code) return;
-    input.value = '';
-    try {
-      const r = await api.post('/loans/return', { barcode: code });
-      addLog(r.days_late ? 'warn' : 'ok', `📥 « ${r.title} » rendu par ${r.first_name} ${r.last_name}${r.days_late ? ` — ${plural(r.days_late, 'jour')} de retard` : ''}`);
-      if (borrower) await selectBorrower(borrower.id, true);
-    } catch (err) {
-      addLog('err', `${code} : ${err.message}`);
-      toast(err.message, 'error');
-    }
-    input.focus();
+    if (/^\d+$/.test(ret.value.trim())) giveBack({ barcode: ret.value.trim() });
+    else $('button[data-loan]', retSuggest)?.click();
   };
 
   drawLog();
-  if (borrower) selectBorrower(borrower.id, true);
+  if (borrower?.kind === 'user') selectUser(borrower.id);
+  else if (borrower?.kind === 'class') selectClass(borrower);
   else who.focus();
 }
 
-function roleLabel(r) {
-  return { admin: 'Administrateur', enseignant: 'Enseignant', eleve: 'Élève' }[r] ?? r;
+async function lend(target, ignore_reservation = false) {
+  if (!borrower) return;
+  const who = borrower.kind === 'class' ? { class_id: borrower.id } : { user_id: borrower.id };
+  try {
+    const r = await api.post('/loans', { ...who, ...target, ignore_reservation });
+    addLog('ok', `📤 « ${r.title} » (n° ${r.barcode}) prêté à ${borrowerName()} — retour le ${fmtDate(r.due_at)}`);
+    $('#loan-code').value = '';
+    $('#book-suggest').innerHTML = '';
+    await refreshBorrower();
+  } catch (err) {
+    if (err.code === 'reserved' && await confirmBox(`${err.message}. Le prêter quand même ?`, { ok: 'Prêter quand même' })) {
+      return lend(target, true);
+    }
+    addLog('err', err.message);
+    toast(err.message, 'error');
+  }
+  $('#loan-code').focus();
 }
 
-async function selectBorrower(id, keepFocus) {
+async function giveBack(target) {
+  try {
+    const r = await api.post('/loans/return', target);
+    addLog(r.days_late ? 'warn' : 'ok', `📥 « ${r.title} » (n° ${r.barcode ?? '?'}) rendu par ${r.first_name} ${r.last_name}${r.days_late ? ` — ${plural(r.days_late, 'jour')} de retard` : ''}`);
+    if (r.reserved_for) {
+      addLog('warn', `🔖 Mettez « ${r.title} » de côté : il est réservé pour ${r.reserved_for}`);
+      toast(`Réservé ! Mettez ce livre de côté pour ${r.reserved_for}`);
+    }
+    $('#return-code').value = '';
+    $('#return-suggest').innerHTML = '';
+    if (borrower) await refreshBorrower();
+  } catch (err) {
+    addLog('err', err.message);
+    toast(err.message, 'error');
+  }
+  $('#return-code').focus();
+}
+
+const borrowerName = () => (borrower.kind === 'class' ? `la classe ${borrower.name}` : borrower.first_name);
+const refreshBorrower = () => (borrower.kind === 'class' ? selectClass(borrower) : selectUser(borrower.id));
+
+async function selectUser(id) {
   const u = await api.get(`/users/${id}`);
-  borrower = u;
+  borrower = { kind: 'user', ...u };
   const settings = state.settings ?? (state.settings = await api.get('/settings'));
   const max = Number(settings[`max_loans_${u.role}`] ?? 2);
-  const late = u.loans.filter((l) => l.overdue);
+  showBorrower({
+    avatar: u.avatar,
+    title: `${u.first_name} ${u.last_name}`,
+    sub: `${u.class_name ?? roleLabel(u.role)} · ${u.loans.length}/${max} prêt(s)`,
+    loans: u.loans,
+    reservations: u.reservations,
+  });
+}
+
+async function selectClass(cls) {
+  const loans = await api.get('/loans' + qs({ loan_class_id: cls.id }));
+  borrower = { kind: 'class', id: cls.id, name: cls.name };
+  showBorrower({ avatar: '📦', title: `Classe ${cls.name}`, sub: `Prêt pour toute la classe · ${plural(loans.length, 'livre')}`, loans, reservations: [] });
+}
+
+function showBorrower({ avatar, title, sub, loans, reservations }) {
+  const late = loans.filter((l) => l.overdue);
   $('#who-suggest').innerHTML = '';
   $('#who').value = '';
   $('#borrower').innerHTML = `<div class="borrower">
-      <span class="avatar-lg">${esc(u.avatar)}</span>
-      <div class="grow"><b>${esc(u.first_name)} ${esc(u.last_name)}</b><br>
-        <span class="muted small">${esc(u.class_name ?? roleLabel(u.role))} · ${u.loans.length}/${max} prêt(s)</span>
+      <span class="avatar-lg">${esc(avatar)}</span>
+      <div class="grow"><b>${esc(title)}</b><br><span class="muted small">${esc(sub)}</span>
         ${late.length ? `<br><span class="badge badge-late">⚠️ ${plural(late.length, 'retard')}</span>` : ''}</div>
       <button class="icon-btn" id="clear-borrower" title="Changer d'emprunteur">✕</button></div>
-    ${u.loans.length ? `<ul class="log">${u.loans.map((l) => `<li class="${l.overdue ? 'err' : ''}">📖 ${esc(l.title)}
-      <span class="muted small">— ${l.overdue ? `en retard de ${plural(l.days_late, 'jour')}` : `à rendre le ${fmtDate(l.due_at)}`}</span></li>`).join('')}</ul>` : ''}`;
+    ${reservations.length ? `<ul class="log">${reservations.map((r) => `<li class="warn">🔖 ${esc(r.title)} —
+      ${r.status === 'prete' ? '<b>mis de côté, à remettre</b>' : 'réservé, en attente du retour'}</li>`).join('')}</ul>` : ''}
+    ${loans.length ? `<ul class="log">${loans.map((l) => `<li class="${l.overdue ? 'err' : ''}">📖 ${esc(l.title)} <span class="muted small">n° ${esc(l.barcode ?? '')}
+      — ${l.overdue ? `en retard de ${plural(l.days_late, 'jour')}` : `à rendre le ${fmtDate(l.due_at)}`}</span>
+      <button class="btn btn-sm give-back" data-loan="${l.id}" style="float:right">Rendre</button></li>`).join('')}</ul>` : ''}`;
   $('#clear-borrower').onclick = () => {
     borrower = null;
     $('#borrower').innerHTML = '';
-    $('#loan-code').disabled = true;
+    $('#book-step').hidden = true;
     $('#who').focus();
   };
-  const input = $('#loan-code');
-  input.disabled = false;
-  input.placeholder = 'Scanner le code-barres…';
-  if (!keepFocus || document.activeElement !== $('#return-code')) input.focus();
+  for (const b of $$('.give-back')) b.onclick = () => giveBack({ loan_id: Number(b.dataset.loan) });
+  $('#book-step').hidden = false;
+  if (document.activeElement !== $('#return-code')) $('#loan-code').focus();
 }
 
 function addLog(cls, text) {
@@ -161,10 +243,10 @@ async function loanTable(el, query, tab) {
         ${classes.map((c) => `<option value="${c.id}" ${String(query.class_id) === String(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
       <span class="muted">${plural(loans.length, 'prêt')}</span><span class="grow"></span>
       <button class="btn" onclick="window.print()">🖨️ Imprimer</button></div>
-    ${loans.length ? `<div class="table-wrap"><table><thead><tr><th>Emprunteur</th><th>Classe</th><th>Document</th><th>Code-barres</th>
+    ${loans.length ? `<div class="table-wrap"><table><thead><tr><th>Emprunteur</th><th>Classe</th><th>Document</th><th>N°</th>
       <th>Prêté le</th><th>${tab === 'history' ? 'Rendu le' : 'À rendre le'}</th>${tab === 'history' ? '' : '<th class="no-print"></th>'}</tr></thead>
       <tbody>${loans.map((l) => `<tr>
-        <td><a href="#/usager/${l.user_id}">${esc(l.avatar)} ${esc(l.first_name)} ${esc(l.last_name)}</a></td>
+        <td>${l.user_id ? `<a href="#/usager/${l.user_id}">${esc(l.avatar)} ${esc(l.first_name)} ${esc(l.last_name)}</a>` : `📦 <b>Toute la classe</b>`}</td>
         <td>${esc(l.class_name ?? '')}</td>
         <td>${l.document_id ? `<a href="#/document/${l.document_id}">${esc(l.title)}</a>` : esc(l.title)} <span class="cote small">${esc(l.cote ?? '')}</span></td>
         <td class="small">${esc(l.barcode ?? '')}</td>
@@ -186,7 +268,10 @@ function bindLoanActions(el) {
     b.onclick = async () => {
       const id = Number(b.dataset.id);
       try {
-        if (b.dataset.act === 'return') { await api.post('/loans/return', { loan_id: id }); toast('Retour enregistré'); }
+        if (b.dataset.act === 'return') {
+          const r = await api.post('/loans/return', { loan_id: id });
+          toast(r.reserved_for ? `Retour enregistré — à mettre de côté pour ${r.reserved_for}` : 'Retour enregistré');
+        }
         if (b.dataset.act === 'renew') { const r = await api.post(`/loans/${id}/renew`); toast(`Prolongé jusqu'au ${fmtDate(r.due_at)}`); }
         if (b.dataset.act === 'lost') {
           if (!(await confirmBox('Déclarer ce livre perdu ? Le prêt sera clôturé et l\'exemplaire marqué « perdu ».', { danger: true, ok: 'Déclarer perdu' }))) return;
@@ -200,25 +285,31 @@ function bindLoanActions(el) {
 
 /* ---------- Retards ---------- */
 
-async function overdue(el, query) {
-  const loans = await api.get('/loans' + qs({ status: 'overdue' }));
+function groupByClass(loans) {
   const byClass = new Map();
   for (const l of loans) {
     const k = l.class_name ?? (l.role === 'eleve' ? 'Sans classe' : 'Adultes');
     if (!byClass.has(k)) byClass.set(k, []);
     byClass.get(k).push(l);
   }
+  return byClass;
+}
+
+const who = (l) => (l.user_id ? `${esc(l.avatar)} ${esc(l.first_name)} ${esc(l.last_name)}` : '📦 <b>Toute la classe</b>');
+
+async function overdue(el, query) {
+  const loans = await api.get('/loans' + qs({ status: 'overdue' }));
   const mode = query.mode ?? 'table';
   el.innerHTML = `<div class="row no-print" style="margin-bottom:.8rem">
       <span class="muted">${plural(loans.length, 'livre')} en retard</span><span class="grow"></span>
       <a class="btn" href="#/retards${mode === 'slips' ? '' : '?mode=slips'}">${mode === 'slips' ? '📋 Vue tableau' : '✉️ Mots pour les familles'}</a>
       <a class="btn" href="/api/loans/overdue.csv" download>⬇️ CSV</a>
       <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimer</button></div>
-    ${!loans.length ? '<div class="empty">🎉 Aucun retard !</div>' : mode === 'slips' ? slips(loans) : [...byClass].map(([cls, list]) => `
+    ${!loans.length ? '<div class="empty">🎉 Aucun retard !</div>' : mode === 'slips' ? slips(loans.filter((l) => l.user_id)) : [...groupByClass(loans)].map(([cls, list]) => `
       <div class="card" style="break-inside:avoid"><h2 style="margin-top:0">${esc(cls)} <span class="muted small">(${list.length})</span></h2>
-      <div class="table-wrap"><table><thead><tr><th>Élève</th><th>Document</th><th>Cote</th><th>À rendre le</th><th class="num">Retard</th><th class="no-print"></th></tr></thead>
-      <tbody>${list.map((l) => `<tr><td>${esc(l.avatar)} ${esc(l.first_name)} ${esc(l.last_name)}</td><td>${esc(l.title)}</td>
-        <td><span class="cote small">${esc(l.cote ?? '')}</span></td><td>${fmtDate(l.due_at)}</td>
+      <div class="table-wrap"><table><thead><tr><th>Emprunteur</th><th>Document</th><th>N°</th><th>À rendre le</th><th class="num">Retard</th><th class="no-print"></th></tr></thead>
+      <tbody>${list.map((l) => `<tr><td>${who(l)}</td><td>${esc(l.title)}</td>
+        <td class="small">${esc(l.barcode ?? '')}</td><td>${fmtDate(l.due_at)}</td>
         <td class="num"><span class="badge badge-late">${plural(l.days_late, 'jour')}</span></td>
         <td class="no-print nowrap"><button class="btn btn-sm act" data-act="return" data-id="${l.id}">Retour</button>
           <button class="btn btn-sm act" data-act="renew" data-id="${l.id}">⏩</button></td></tr>`).join('')}</tbody></table></div></div>`).join('')}`;
@@ -241,4 +332,57 @@ function slips(loans) {
       <p class="small">Merci de bien vouloir ${list.length > 1 ? 'les' : 'le'} rapporter à l'école. Si le livre est perdu ou abîmé, prenez contact avec l'enseignant.</p>
     </div>`;
   }).join('')}</div>`;
+}
+
+/* ---------- Réservations ---------- */
+
+async function reservations(el) {
+  const list = await api.get('/reservations');
+  el.innerHTML = `<p class="muted no-print">Pour réserver un livre : ouvrez sa fiche puis « Réserver pour… ». Les élèves peuvent aussi appuyer sur « Je le veux ! ».
+      Quand un livre réservé est rendu, l'application vous prévient de le mettre de côté.</p>
+    ${list.length ? `<div class="table-wrap"><table><thead><tr><th>Livre</th><th>Pour</th><th>Classe</th><th>Depuis le</th><th>Situation</th><th></th></tr></thead>
+      <tbody>${list.map((r) => `<tr class="${r.status === 'prete' ? 'row-warn' : ''}">
+        <td><a href="#/document/${r.document_id}">${esc(r.title)}</a> <span class="cote small">${esc(r.cote ?? '')}</span></td>
+        <td>${esc(r.avatar)} ${esc(r.first_name)} ${esc(r.last_name)}</td><td>${esc(r.class_name ?? '')}</td>
+        <td>${fmtDate(r.created_at)}</td>
+        <td>${r.status === 'prete' ? '<span class="badge badge-warn">📚 Mis de côté — à lui remettre</span>' : '<span class="badge">⏳ Attend le retour</span>'}</td>
+        <td class="num"><button class="btn btn-sm cancel" data-id="${r.id}">Annuler</button></td></tr>`).join('')}</tbody></table></div>`
+    : '<div class="empty">Aucune réservation en cours.</div>'}`;
+  for (const b of $$('.cancel', el)) {
+    b.onclick = async () => {
+      const r = await api.del(`/reservations/${b.dataset.id}`);
+      toast(r.reserved_for ? `Annulée — le livre est maintenant pour ${r.reserved_for}` : 'Réservation annulée');
+      navigate(location.hash);
+    };
+  }
+}
+
+/* ---------- Fin d'année ---------- */
+
+async function endOfYear(el, query) {
+  const classes = await api.get('/classes');
+  const loans = await api.get('/loans' + qs({ class_id: query.class_id, limit: 5000 }));
+  const y = new Date().getMonth() >= 7 ? new Date().getFullYear() + 1 : new Date().getFullYear();
+  const deadline = query.date ?? `${y}-06-26`;
+  el.innerHTML = `<div class="card no-print">
+      <p style="margin-top:0">Avant les grandes vacances, tous les livres doivent revenir à la bibliothèque.</p>
+      <form class="row" id="f">
+        <label>Date limite <input type="date" name="date" value="${esc(deadline)}" style="width:auto"></label>
+        <label>Classe <select name="class_id" style="width:auto"><option value="">Toutes</option>
+          ${classes.map((c) => `<option value="${c.id}" ${String(query.class_id) === String(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
+        <button type="button" class="btn" id="apply">📅 Fixer cette date de retour pour ces ${loans.length} prêts</button>
+        <button type="button" class="btn btn-primary" onclick="window.print()">🖨️ Imprimer les listes par classe</button></form></div>
+    ${!loans.length ? '<div class="empty">🎉 Tous les livres sont rentrés !</div>' : [...groupByClass(loans)].map(([cls, list]) => `
+      <div class="card print-page"><h2 style="margin-top:0">${esc(cls)} — livres à rendre avant le ${fmtDate(deadline)}</h2>
+        <p class="muted small">${esc(state.info.school_name)} · ${plural(list.length, 'livre')}</p>
+        <table class="dense"><thead><tr><th>Emprunteur</th><th>Livre</th><th>N°</th><th>Rendu ✓</th></tr></thead>
+        <tbody>${list.map((l) => `<tr><td>${who(l)}</td><td>${esc(l.title)}</td><td>${esc(l.barcode ?? '')}</td><td>☐</td></tr>`).join('')}</tbody></table></div>`).join('')}`;
+  const f = $('#f');
+  f.onchange = () => navigate('#/prets' + qs({ vue: 'fin', date: f.date.value, class_id: f.class_id.value }));
+  $('#apply').onclick = async () => {
+    if (!(await confirmBox(`Tous ces prêts devront être rendus le ${fmtDate(f.date.value)} au plus tard. Continuer ?`))) return;
+    const r = await api.post('/loans/due-date', { due_at: f.date.value, class_id: f.class_id.value || undefined });
+    toast(`${plural(r.updated, 'prêt')} mis à jour`);
+    navigate(location.hash);
+  };
 }

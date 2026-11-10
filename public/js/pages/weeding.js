@@ -1,6 +1,7 @@
 import { api, qs } from '../api.js';
 import { esc, toast, confirmBox, formData, fmtDate, plural, $, $$ } from '../ui.js';
 import { state, navigate, typeLabel } from '../state.js';
+import { tabs } from './catalogue.js';
 
 export async function render(app, { query }) {
   const types = Object.entries(state.meta.doc_types);
@@ -10,6 +11,7 @@ export async function render(app, { query }) {
 
   app.innerHTML = `<div class="page-head"><div><h1>Désherbage</h1>
       <p class="muted">Repérez les documents anciens, abîmés ou qui ne sortent plus, puis retirez-les du catalogue en une fois.</p></div></div>
+    ${tabs('weeding')}
     <form class="card grid grid-4 no-print" id="f">
       <label>Parus avant (année)<input name="year_before" type="number" value="${esc(query.year_before)}" placeholder="${new Date().getFullYear() - 20}"></label>
       <label>Non empruntés depuis<select name="no_loan_years"><option value="">—</option>

@@ -1,0 +1,90 @@
+# Fabrique l'installateur Windows, l'installe sur une machine Windows et vérifie que l'application démarre.
+# Le fichier Installer-BCD-x.y.z.exe est disponible dans l'onglet « Actions » (rubrique Artifacts),
+# et, pour une version étiquetée (ex. v1.0.0), dans l'onglet « Releases ».
+name: Application Windows
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Tests automatiques
+        run: npm test
+
+      - name: Fabriquer l'installateur
+        run: npx electron-builder --win --x64 --publish never
+
+      - name: Installer l'application (comme un utilisateur, sans droits administrateur)
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem dist\Installer-BCD-*.exe | Select-Object -First 1
+          Start-Process -FilePath $installer.FullName -ArgumentList '/S' -Wait
+          $exe = "$env:LOCALAPPDATA\Programs\BCD\BCD.exe"
+          if (-not (Test-Path $exe)) { throw "Application non installée : $exe introuvable" }
+          Write-Host "Installée : $exe"
+          if (-not (Test-Path "$env:USERPROFILE\Desktop\BCD.lnk")) { Write-Warning "Raccourci bureau absent" }
+
+      - name: Lancer l'application installée et vérifier qu'elle démarre
+        shell: pwsh
+        run: |
+          $result = "$env:RUNNER_TEMP\bcd-smoke.txt"
+          $env:BCD_SMOKE_TEST = $result
+          $env:BCD_DATA_DIR = "$env:RUNNER_TEMP\bcd-data"
+          $p = Start-Process -FilePath "$env:LOCALAPPDATA\Programs\BCD\BCD.exe" -PassThru
+          if (-not $p.WaitForExit(120000)) { $p.Kill(); throw "L'application ne s'est pas fermée à temps" }
+          if (-not (Test-Path $result)) { throw "Pas de résultat de démarrage" }
+          $text = Get-Content $result -Raw
+          Write-Host $text
+          if (-not $text.StartsWith('OK')) { throw "Échec du démarrage" }
+          if (-not (Test-Path "$env:BCD_DATA_DIR\bcd.sqlite")) { throw "Base de données non créée" }
+
+      - name: Tester la version zip (sans installation)
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist\BCD-*-sans-installation.zip | Select-Object -First 1
+          $dir = "$env:RUNNER_TEMP\bcd-zip"
+          Expand-Archive -Path $zip.FullName -DestinationPath $dir -Force
+          $result = "$env:RUNNER_TEMP\bcd-smoke-zip.txt"
+          $env:BCD_SMOKE_TEST = $result
+          $env:BCD_DATA_DIR = "$env:RUNNER_TEMP\bcd-data-zip"
+          $p = Start-Process -FilePath "$dir\BCD.exe" -PassThru
+          if (-not $p.WaitForExit(120000)) { $p.Kill(); throw "La version zip ne s'est pas fermée à temps" }
+          $text = Get-Content $result -Raw
+          Write-Host $text
+          if (-not $text.StartsWith('OK')) { throw "Échec du démarrage de la version zip" }
+
+      - name: Mettre les fichiers à disposition
+        uses: actions/upload-artifact@v4
+        with:
+          name: BCD-Windows
+          path: |
+            dist/Installer-BCD-*.exe
+            dist/BCD-*-sans-installation.zip
+          retention-days: 30
+
+      - name: Publier la version
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Installer-BCD-*.exe
+            dist/BCD-*-sans-installation.zip

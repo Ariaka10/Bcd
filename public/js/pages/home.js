@@ -3,7 +3,10 @@ import { esc, cover, $ } from '../ui.js';
 import { state, navigate, typeLabel } from '../state.js';
 
 export async function render(app) {
-  const s = await api.get('/stats');
+  const [s, rem] = await Promise.all([
+    api.get('/stats'),
+    state.user.role === 'admin' ? api.get('/admin/reminders').catch(() => ({})) : {},
+  ]);
   const max = Math.max(1, ...s.by_class.map((c) => c.n));
   const maxType = Math.max(1, ...s.by_type.map((t) => t.n));
   app.innerHTML = `
@@ -11,6 +14,11 @@ export async function render(app) {
       <p class="muted">${esc(state.info.school_name)} — tableau de bord de la BCD</p></div>
       <div class="row"><a class="btn btn-primary btn-lg" href="#/prets">📚 Prêts et retours</a></div></div>
 
+    ${rem.rentree ? `<a class="card reminder" href="#/rentree">🎒 <b>Nouvelle année scolaire ${esc(rem.rentree.replace('-', ' – '))}</b> :
+      lancez l'assistant de rentrée (import ONDE, élèves partis, classes)…</a>` : ''}
+    ${rem.extra_backup_days != null ? `<a class="card reminder" href="#/parametres">🔑 <b>Branchez la clé USB de sauvegarde</b> :
+      ${rem.extra_backup_days < 0 ? 'aucune copie faite pour le moment' : `pas de copie depuis ${rem.extra_backup_days} jours`}.
+      La copie se fait toute seule à la fermeture de l'application.</a>` : ''}
     <form class="searchbar card" id="quick" style="margin-bottom:1rem">
       <input name="q" placeholder="Rechercher dans le catalogue : titre, auteur, sujet, ISBN, cote…" autofocus>
       <button class="btn btn-primary">Rechercher</button></form>
@@ -19,11 +27,12 @@ export async function render(app) {
       <a class="stat" href="#/catalogue"><b>${s.documents}</b><span>documents (${s.copies} exemplaires)</span></a>
       <a class="stat" href="#/prets"><b>${s.active_loans}</b><span>prêts en cours</span></a>
       <a class="stat ${s.overdue ? 'stat-alert' : ''}" href="#/retards"><b>${s.overdue}</b><span>retards</span></a>
+      ${s.reservations ? `<a class="stat stat-warn" href="#/prets?vue=reservations"><b>${s.reservations}</b><span>livre(s) réservé(s) à remettre</span></a>` : ''}
       <a class="stat" href="#/usagers"><b>${s.students}</b><span>élèves · ${s.classes} classes</span></a>
       <div class="stat"><b>${s.loans_this_year}</b><span>prêts depuis la rentrée</span></div>
     </div>
 
-    <div class="grid grid-2">
+    <div class="grid grid-2 home-grid">
       <div class="card"><h2 style="margin-top:0">Prêts par classe (depuis la rentrée)</h2>
         ${s.by_class.length ? `<div class="bars">${s.by_class.map((c) => `<div class="bar"><span>${esc(c.name)}</span>
           <div class="bar-track"><div class="bar-fill" style="width:${(c.n / max) * 100}%"></div></div><span class="num">${c.n}</span></div>`).join('')}</div>`

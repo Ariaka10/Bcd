@@ -1,16 +1,71 @@
 {
   "name": "bcd",
-  "version": "1.0.0",
-  "description": "Gestion de BCD (bibliothèque centre documentaire) pour l'école primaire : catalogue, notices BnF par ISBN, prêts, usagers, import ONDE.",
+  "productName": "BCD",
+  "version": "1.3.0",
+  "description": "Gestion de BCD (bibliothèque centre documentaire) pour l'école maternelle et élémentaire : catalogue, notices BnF par ISBN, prêts, élèves (import ONDE), thèmes, réservations, sauvegardes.",
+  "author": "BCD",
   "type": "module",
-  "main": "server/index.js",
+  "main": "electron/main.js",
   "engines": {
     "node": ">=22.13"
   },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server/index.js",
     "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
-    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js",
+    "app": "electron .",
+    "dist:win": "electron-builder --win --x64 --publish never"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "44.10.2",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "fr.ecole.bcd",
+    "productName": "BCD",
+    "copyright": "BCD — gestion de bibliothèque scolaire",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**",
+      "server/**",
+      "public/**",
+      "build/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "BCD-${version}-sans-installation.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "BCD",
+      "artifactName": "Installer-BCD-${version}.${ext}",
+      "deleteAppDataOnUninstall": false,
+      "language": "1036",
+      "installerLanguages": [
+        "fr_FR"
+      ]
+    }
+  }
 }

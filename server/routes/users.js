@@ -2,7 +2,7 @@ import { HttpError, hashPassword, normalize, randomAvatar, AVATARS, CODE_SYMBOLS
 import { tx } from '../db.js';
 import { staff, admin } from '../guards.js';
 import { parseStudentList } from '../csv.js';
-import { listLoans } from './loans.js';
+import { listLoans, listReservations } from './loans.js';
 
 const ROLES = ['admin', 'enseignant', 'eleve'];
 
@@ -163,6 +163,7 @@ export default function (r) {
     if (user.role !== 'admin') delete u.secret_code;
     u.loans = listLoans(db, { user_id: u.id });
     u.history = listLoans(db, { user_id: u.id, status: 'history', limit: 50 });
+    u.reservations = listReservations(db, { user_id: u.id });
     return u;
   });
 
@@ -233,7 +234,8 @@ export default function (r) {
   r.get('/api/classes', staff, ({ db }) => db.prepare(`
     SELECT c.id, c.name, c.level, c.teacher_id, t.first_name || ' ' || t.last_name AS teacher_name,
       (SELECT COUNT(*) FROM users u WHERE u.class_id = c.id AND u.role = 'eleve' AND u.active = 1) AS students,
-      (SELECT COUNT(*) FROM loans l JOIN users u ON u.id = l.user_id WHERE u.class_id = c.id AND l.returned_at IS NULL) AS active_loans
+      (SELECT COUNT(*) FROM loans l JOIN users u ON u.id = l.user_id WHERE u.class_id = c.id AND l.returned_at IS NULL) AS active_loans,
+      (SELECT COUNT(*) FROM loans l WHERE l.class_id = c.id AND l.returned_at IS NULL) AS class_loans
     FROM classes c LEFT JOIN users t ON t.id = c.teacher_id ORDER BY c.name`).all());
 
   r.post('/api/classes', admin, ({ db, body }) => {
@@ -253,6 +255,9 @@ export default function (r) {
   });
 
   r.delete('/api/classes/:id', admin, ({ db, params }) => {
+    if (db.prepare('SELECT 1 FROM loans WHERE class_id = ? AND returned_at IS NULL').get(params.id)) {
+      throw new HttpError(409, 'Cette classe a des livres en prêt : enregistrez d\'abord leur retour');
+    }
     db.prepare('DELETE FROM classes WHERE id = ?').run(params.id);
     return { ok: true };
   });

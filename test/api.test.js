@@ -62,7 +62,7 @@ test('parcours complet : installation, catalogue, élèves, prêts, désherbage'
   r = await adm.post('/api/documents', { ...r.data.notice, copies: 2 });
   assert.equal(r.status, 200);
   const matildaId = r.data.id;
-  assert.deepEqual(r.data.barcodes, ['BCD000001', 'BCD000002']);
+  assert.deepEqual(r.data.barcodes, ['1', '2']);
   assert.equal((await adm.get('/api/isbn/9782070612758')).data.local.id, matildaId);
 
   r = await adm.post('/api/documents', { title: 'Les volcans', doc_type: 'documentaire', authors: 'Ledu, Stéphanie', pub_year: 1995 });
@@ -105,23 +105,23 @@ test('parcours complet : installation, catalogue, élèves, prêts, désherbage'
   assert.equal((await eleve.post('/api/login/eleve', { user_id: lea.id, code: ['⭐', '🍎'] })).status, 401);
   assert.equal((await eleve.post('/api/login/eleve', { user_id: lea.id, code: ['🍎', '⭐'] })).status, 200);
   assert.equal((await eleve.get('/api/documents?q=matilda')).data.total, 1);
-  assert.equal((await eleve.post('/api/loans', { user_id: lea.id, barcode: 'BCD000001' })).status, 403);
+  assert.equal((await eleve.post('/api/loans', { user_id: lea.id, barcode: '1' })).status, 403);
 
   // Prêts : limite, retards, retour, prolongation
   r = await adm.post('/api/loans', { user_id: lea.id, barcode: '9782070612758' }); // par ISBN
   assert.equal(r.status, 200);
-  assert.equal(r.data.barcode, 'BCD000001');
-  assert.equal((await adm.post('/api/loans', { user_id: lea.id, barcode: 'BCD000001' })).status, 409);
+  assert.equal(r.data.barcode, '1');
+  assert.equal((await adm.post('/api/loans', { user_id: lea.id, barcode: '1' })).status, 409);
   const volcansCopy = (await adm.get(`/api/documents/${volcansId}`)).data.copies[0].barcode;
   assert.equal((await adm.post('/api/loans', { user_id: lea.id, barcode: volcansCopy })).status, 200);
-  r = await adm.post('/api/loans', { user_id: lea.id, barcode: 'BCD000002' });
+  r = await adm.post('/api/loans', { user_id: lea.id, barcode: '2' });
   assert.equal(r.status, 409);
   assert.match(r.data.error, /Limite/);
 
   assert.equal((await eleve.get('/api/me/loans')).data.current.length, 2);
   assert.equal((await adm.get(`/api/documents/${matildaId}`)).data.available_count, 1);
 
-  db.prepare(`UPDATE loans SET due_at = '2020-01-01' WHERE copy_id = (SELECT id FROM copies WHERE barcode = 'BCD000001')`).run();
+  db.prepare(`UPDATE loans SET due_at = '2020-01-01' WHERE copy_id = (SELECT id FROM copies WHERE barcode = '1')`).run();
   r = await adm.get('/api/loans?status=overdue');
   assert.equal(r.data.length, 1);
   assert.ok(r.data[0].days_late > 0);
@@ -131,9 +131,9 @@ test('parcours complet : installation, catalogue, élèves, prêts, désherbage'
   assert.equal(r.status, 200);
   assert.equal((await adm.get('/api/loans?status=overdue')).data.length, 0);
 
-  r = await adm.post('/api/loans/return', { barcode: 'BCD000001' });
+  r = await adm.post('/api/loans/return', { barcode: '1' });
   assert.equal(r.data.first_name, 'Léa');
-  assert.equal((await adm.post('/api/loans/return', { barcode: 'BCD000001' })).status, 404);
+  assert.equal((await adm.post('/api/loans/return', { barcode: '1' })).status, 404);
 
   // Listes thématiques
   r = await adm.post('/api/lists', { name: 'Sciences', from_search: { doc_type: 'documentaire' } });

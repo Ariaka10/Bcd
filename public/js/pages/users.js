@@ -224,12 +224,15 @@ async function renderClassSheet(app, id) {
   const cls = classes.find((c) => c.id === Number(id));
   if (!cls) { app.innerHTML = '<div class="empty">Classe introuvable.</div>'; return; }
   const [students, loans] = await Promise.all([
-    api.get(`/users?class_id=${cls.id}&role=eleve`),
+    api.get(`/users?class_id=${cls.id}&role=eleve&active=all`),
     api.get(`/loans?class_id=${cls.id}&limit=2000`),
   ]);
   const byUser = new Map();
   for (const l of loans) if (l.user_id) (byUser.get(l.user_id) ?? byUser.set(l.user_id, []).get(l.user_id)).push(l);
   const classLoans = loans.filter((l) => !l.user_id);
+  // Élèves partis (archivés) : affichés seulement s'ils ont encore un livre à rendre.
+  const shown = students.filter((u) => u.active || byUser.has(u.id));
+  const activeCount = students.filter((u) => u.active).length;
   const late = loans.filter((l) => l.overdue).length;
   app.innerHTML = `<div class="page-head no-print"><a href="javascript:history.back()" class="btn btn-ghost">← Retour</a>
       <div class="row"><select id="cls" style="width:auto">${classes.map((c) => `<option value="${c.id}" ${c.id === cls.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
@@ -238,12 +241,13 @@ async function renderClassSheet(app, id) {
     <div class="card">
       <h1 style="margin-bottom:.2rem">🏫 ${esc(cls.name)}</h1>
       <p class="muted">${esc(state.info.school_name)}${cls.teacher_name ? ` · ${esc(cls.teacher_name)}` : ''} ·
-        ${plural(students.length, 'élève')} · ${plural(loans.length, 'livre')} en prêt${late ? ` · <b class="text-late">${plural(late, 'retard')}</b>` : ''}
+        ${plural(activeCount, 'élève')} · ${plural(loans.length, 'livre')} en prêt${late ? ` · <b class="text-late">${plural(late, 'retard')}</b>` : ''}
         · le ${new Date().toLocaleDateString('fr-FR')}</p>
       <table class="dense class-sheet"><thead><tr><th>Élève</th><th>Livre(s) empruntés</th><th>N°</th><th>À rendre le</th><th class="print-only">Rendu ✓</th></tr></thead>
-      <tbody>${students.map((u) => {
+      <tbody>${shown.map((u) => {
         const list = byUser.get(u.id) ?? [];
-        const name = `<a href="#/usager/${u.id}">${esc(u.avatar)} <b>${esc(u.first_name)}</b> ${esc(u.last_name)}</a>`;
+        const name = `<a href="#/usager/${u.id}">${esc(u.avatar)} <b>${esc(u.first_name)}</b> ${esc(u.last_name)}</a>`
+          + (u.active ? '' : '<br><span class="badge badge-warn">parti — livre à récupérer</span>');
         if (!list.length) return `<tr><td>${name}</td><td class="muted">—</td><td></td><td></td><td class="print-only"></td></tr>`;
         return list.map((l, i) => `<tr class="${l.overdue ? 'row-late' : ''}">${i === 0 ? `<td rowspan="${list.length}">${name}</td>` : ''}
           <td>${esc(l.title)}</td><td>${esc(l.barcode ?? '')}</td>

@@ -2,6 +2,13 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
+## [1.3.2] — 2026-11-11
+
+### Corrigé
+- **Fiche classe** : un élève parti (archivé, par exemple après l'import ONDE de la rentrée) qui a encore
+  un livre n'était pas affiché, alors que son livre était compté dans le total. Il apparaît maintenant
+  avec la mention « parti — livre à récupérer ». Même mention dans les listes de prêts, retards et fin d'année.
+
 ## [1.3.1] — 2026-11-11
 
 ### Ajouté

@@ -62,6 +62,10 @@ test('assistant de rentrée', async () => {
   await call('POST', '/api/loans', { user_id: gardeLivre, barcode: '1' });
   await call('POST', '/api/users/batch', { ids: [parti, gardeLivre], action: 'archive' });
   assert.ok(db.prepare('SELECT archived_at FROM users WHERE id = ?').get(parti).archived_at);
+  // L'élève parti qui a encore un livre reste visible, marqué comme parti
+  const pret = (await call('GET', `/api/loans?class_id=${cls}`)).data;
+  assert.equal(pret.length, 1);
+  assert.equal(pret[0].user_active, false);
 
   let r = await call('GET', '/api/admin/rentree');
   assert.equal(r.data.archived.length, 2);

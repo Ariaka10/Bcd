@@ -13,6 +13,7 @@ const LOAN_SELECT = `
     CASE WHEN l.class_id IS NOT NULL THEN cl.name ELSE u.last_name END AS last_name,
     CASE WHEN l.class_id IS NOT NULL THEN '📦' ELSE u.avatar END AS avatar,
     CASE WHEN l.class_id IS NOT NULL THEN 'classe' ELSE u.role END AS role,
+    CASE WHEN l.class_id IS NOT NULL THEN 1 ELSE u.active END AS user_active,
     cl.id AS class_id, cl.name AS class_name
   FROM loans l
   LEFT JOIN copies c ON c.id = l.copy_id
@@ -28,6 +29,7 @@ function decorate(loans) {
     l.days_late = !l.returned_at ? Math.max(0, daysBetween(l.due_at, today)) : 0;
     l.overdue = l.days_late > 0;
     l.is_class_loan = Boolean(l.is_class_loan);
+    l.user_active = Boolean(l.user_active); // false : élève parti (archivé) qui a encore le livre
   }
   return loans;
 }

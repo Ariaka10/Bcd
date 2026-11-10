@@ -246,7 +246,7 @@ async function loanTable(el, query, tab) {
     ${loans.length ? `<div class="table-wrap"><table><thead><tr><th>Emprunteur</th><th>Classe</th><th>Document</th><th>N°</th>
       <th>Prêté le</th><th>${tab === 'history' ? 'Rendu le' : 'À rendre le'}</th>${tab === 'history' ? '' : '<th class="no-print"></th>'}</tr></thead>
       <tbody>${loans.map((l) => `<tr>
-        <td>${l.user_id ? `<a href="#/usager/${l.user_id}">${esc(l.avatar)} ${esc(l.first_name)} ${esc(l.last_name)}</a>` : `📦 <b>Toute la classe</b>`}</td>
+        <td>${l.user_id ? `<a href="#/usager/${l.user_id}">${esc(l.avatar)} ${esc(l.first_name)} ${esc(l.last_name)}</a>${l.user_active ? '' : ' <span class="badge badge-warn">parti</span>'}` : `📦 <b>Toute la classe</b>`}</td>
         <td>${esc(l.class_name ?? '')}</td>
         <td>${l.document_id ? `<a href="#/document/${l.document_id}">${esc(l.title)}</a>` : esc(l.title)} <span class="cote small">${esc(l.cote ?? '')}</span></td>
         <td class="small">${esc(l.barcode ?? '')}</td>
@@ -295,7 +295,9 @@ function groupByClass(loans) {
   return byClass;
 }
 
-const who = (l) => (l.user_id ? `${esc(l.avatar)} ${esc(l.first_name)} ${esc(l.last_name)}` : '📦 <b>Toute la classe</b>');
+const who = (l) => (l.user_id
+  ? `${esc(l.avatar)} ${esc(l.first_name)} ${esc(l.last_name)}${l.user_active ? '' : ' <span class="badge badge-warn">parti</span>'}`
+  : '📦 <b>Toute la classe</b>');
 
 async function overdue(el, query) {
   const loans = await api.get('/loans' + qs({ status: 'overdue' }));

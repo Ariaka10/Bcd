@@ -87,3 +87,21 @@ test('assistant de rentrée', async () => {
   await call('POST', '/api/users/batch', { ids: [u], action: 'activate' });
   assert.equal(db.prepare('SELECT archived_at FROM users WHERE id = ?').get(u).archived_at, null);
 });
+
+test('import ONDE : élèves qui partent avec un livre', async () => {
+  const cls = (await call('POST', '/api/classes', { name: 'CM2 test' })).id;
+  const reste = (await call('POST', '/api/users', { role: 'eleve', first_name: 'Reste', last_name: 'ICI', class_id: cls })).data.id;
+  const part = (await call('POST', '/api/users', { role: 'eleve', first_name: 'Part', last_name: 'AVECLIVRE', class_id: cls })).data.id;
+  const doc = (await call('POST', '/api/documents', { title: 'Livre emporté', doc_type: 'album' })).data;
+  await call('POST', '/api/loans', { user_id: part, barcode: doc.barcodes[0] });
+  void reste;
+  const csv = 'Nom élève;Prénom élève;Classe\nICI;Reste;CM2 test\n';
+  let r = await call('POST', '/api/users/import', { text: csv, archive_missing: true, dry_run: true });
+  const mine = r.data.archived_with_loans.filter((u) => u.id === part);
+  assert.equal(mine.length, 1);
+  assert.equal(mine[0].loans[0].title, 'Livre emporté');
+  r = await call('POST', '/api/users/import', { text: csv, archive_missing: true });
+  const departed = (await call('GET', '/api/loans?departed=1')).data;
+  assert.ok(departed.some((l) => l.user_id === part && l.title === 'Livre emporté'));
+  assert.ok((await call('GET', '/api/stats')).data.departed_loans >= 1);
+});

@@ -170,6 +170,7 @@ export function listLoans(db, q) {
   if (q.user_id) { where.push('l.user_id = ?'); args.push(Number(q.user_id)); }
   if (q.class_id) { where.push('coalesce(l.class_id, u.class_id) = ?'); args.push(Number(q.class_id)); }
   if (q.class_loans === '1') where.push('l.class_id IS NOT NULL');
+  if (q.departed === '1') where.push('l.user_id IS NOT NULL AND u.active = 0'); // élèves partis avec un livre
   if (q.loan_class_id) { where.push('l.class_id = ?'); args.push(Number(q.loan_class_id)); }
   if (q.document_id) { where.push('l.document_id = ?'); args.push(Number(q.document_id)); }
   if (q.q) {

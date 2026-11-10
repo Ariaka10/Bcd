@@ -356,6 +356,16 @@ function showReport(r, dry, onConfirm) {
       <div class="stat"><b>${r.archived.length}</b><span>à archiver</span></div>
       <div class="stat"><b>${r.new_classes.length}</b><span>classes créées</span></div></div>
     ${r.errors.length ? section('⚠️ Problèmes', r.errors, 'err') : ''}
+    ${r.archived_with_loans?.length ? `<div class="card departed-box">
+      <h3 style="margin-top:0">🎒 ${plural(r.archived_with_loans.length, 'élève qui part', 'élèves qui partent')} avec un livre</h3>
+      <p class="small">Si le livre est déjà revenu, cliquez sur « Rendu ». S'il est perdu, sur « Perdu ».
+        Sinon, ne faites rien : le prêt est conservé et vous le retrouverez dans <b>Prêts → Élèves partis</b>
+        (avec un mot pour la famille à imprimer).</p>
+      <ul class="log">${r.archived_with_loans.flatMap((u) => u.loans.map((l) => `<li data-loan="${l.id}">
+        <b>${esc(u.name)}</b> <span class="muted small">${esc(u.class_name ?? '')}</span> — ${esc(l.title)}
+        <span class="muted small">n° ${esc(l.barcode ?? '')}</span>
+        <span class="loan-actions" style="float:right"><button class="btn btn-sm dep-act" data-act="return" data-id="${l.id}">✅ Rendu</button>
+          <button class="btn btn-sm dep-act" data-act="lost" data-id="${l.id}">❓ Perdu</button></span></li>`)).join('')}</ul></div>` : ''}
     ${section('Classes créées', r.new_classes)}
     ${section('Nouveaux élèves', r.created, 'ok')}
     ${section('Changements de classe', r.moved, 'warn')}
@@ -365,6 +375,15 @@ function showReport(r, dry, onConfirm) {
         <a class="btn" href="#/usagers">Voir les usagers</a><a class="btn btn-primary" href="#/cartes">🪪 Imprimer les cartes de connexion</a></div>`}
   </div>`;
   if (dry) $('#go').onclick = onConfirm;
+  for (const b of $$('.dep-act')) {
+    b.onclick = async () => {
+      const lost = b.dataset.act === 'lost';
+      try {
+        await api.post('/loans/return', { loan_id: Number(b.dataset.id), lost });
+        b.closest('.loan-actions').innerHTML = lost ? '<span class="badge badge-late">déclaré perdu</span>' : '<span class="badge badge-ok">rendu</span>';
+      } catch (e) { toast(e.message, 'error'); }
+    };
+  }
 }
 
 /* ---------- Cartes de connexion à imprimer ---------- */

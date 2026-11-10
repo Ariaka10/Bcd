@@ -358,3 +358,4 @@ a.kid-loan { text-decoration: none; color: inherit; }
   .class-sheet a { text-decoration: none; }
 }
 .home-grid { align-items: start; }
+.departed-box { background: var(--warn-soft); margin: 1rem 0; }

@@ -120,7 +120,7 @@ async function renderInventory(app, query) {
       <p class="muted">${plural(res.total, 'titre')} · ${plural(copies, 'exemplaire')} · ${available} en rayon · ${copies - available} sortis ou indisponibles</p></div>
       <div class="row no-print">
         <a class="btn" href="/api/documents/export.csv${qs(q)}" download>⬇️ Exporter (Excel / CSV)</a>
-        <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimer</button></div></div>
+        <button class="btn btn-primary" onclick="bcdPrint()">🖨️ Imprimer</button></div></div>
     ${tabs('all')}
     <form class="row card no-print" id="filters" style="margin-bottom:1rem">
       <select name="theme_id" style="width:auto">${themeOptions(q.theme_id).replace('>Tous<', '>Tous les thèmes<')}</select>

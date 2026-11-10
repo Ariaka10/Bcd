@@ -359,3 +359,11 @@ a.kid-loan { text-decoration: none; color: inherit; }
 }
 .home-grid { align-items: start; }
 .departed-box { background: var(--warn-soft); margin: 1rem 0; }
+
+/* Aperçu avant impression */
+.modal-print { width: min(1180px, calc(100vw - 2rem)); }
+.modal-print .modal-body { max-height: calc(100vh - 6rem); padding: 0; display: flex; flex-direction: column; }
+.print-toolbar { display: flex; gap: 1rem; align-items: center; padding: .6rem 1rem; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.print-stage { background: #8f8a80; padding: 1.2rem; overflow: auto; flex: 1; min-height: 50vh; text-align: center; }
+.print-sheet { background: #fff; border: 0; box-shadow: 0 4px 18px rgba(0,0,0,.35); display: inline-block; max-width: none; }
+.modal-print .actions { padding: .6rem 1rem; margin: 0; border-top: 1px solid var(--line); }

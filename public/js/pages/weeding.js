@@ -24,7 +24,7 @@ export async function render(app, { query }) {
         <span class="muted small">Les critères se cumulent. Les documents en prêt ne seront jamais supprimés.</span></div></form>
     ${!hasCrit ? '<div class="empty">Choisissez au moins un critère.</div>'
       : res.items.length ? `<div class="row" style="margin:1rem 0 .5rem"><b>${plural(res.items.length, 'candidat')}</b><span class="grow"></span>
-        <button class="btn no-print" onclick="window.print()">🖨️ Imprimer la liste (pour vérifier en rayon)</button></div>
+        <button class="btn no-print" onclick="bcdPrint()">🖨️ Imprimer la liste (pour vérifier en rayon)</button></div>
       <div class="table-wrap"><table><thead><tr><th class="no-print"><input type="checkbox" id="all" checked></th><th>Cote</th><th>Titre</th>
         <th>Type</th><th>Année</th><th class="num">Ex.</th><th>État</th><th class="num">Prêts</th><th>Dernier prêt</th></tr></thead>
       <tbody>${res.items.map((d) => `<tr><td class="no-print"><input type="checkbox" class="sel" value="${d.id}" checked></td>

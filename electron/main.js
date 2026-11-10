@@ -164,7 +164,7 @@ function buildMenu() {
         { label: 'Ouvrir le dossier des données', click: () => shell.openPath(dataDir) },
         { label: 'Ouvrir le dossier des sauvegardes', click: () => shell.openPath(backupDir) },
         { type: 'separator' },
-        { label: 'Imprimer…', accelerator: 'CmdOrCtrl+P', click: () => win?.webContents.print() },
+        { label: 'Imprimer…', accelerator: 'CmdOrCtrl+P', click: () => win?.webContents.executeJavaScript('window.bcdPrint && window.bcdPrint()') },
         { type: 'separator' },
         { label: 'Quitter', role: 'quit' },
       ],

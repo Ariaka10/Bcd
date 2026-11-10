@@ -5,6 +5,8 @@ Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeu
 ## [1.3.2] — 2026-11-11
 
 ### Ajouté
+- **Aperçu avant impression** : chaque bouton « Imprimer » (et Ctrl+P) ouvre d'abord une fenêtre montrant la feuille
+  telle qu'elle sortira (A4, portrait ou paysage), avec le bouton « Imprimer » en bas.
 - **Import ONDE : élèves qui partent avec un livre** signalés dans l'aperçu, avec des boutons « Rendu » / « Perdu »
   pour régler le prêt tout de suite (sinon le prêt est conservé).
 - Onglet **Prêts → Élèves partis** : les livres encore chez des élèves archivés, avec les mots pour les familles

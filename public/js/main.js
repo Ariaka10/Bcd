@@ -1,5 +1,14 @@
 import { api } from './api.js';
-import { $, esc, toast } from './ui.js';
+import { $, esc, toast, printPreview } from './ui.js';
+
+// Tous les boutons « Imprimer » (et Ctrl+P) ouvrent d'abord l'aperçu avant impression.
+window.bcdPrint = () => printPreview();
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+    e.preventDefault();
+    if (!document.querySelector('dialog.modal-print[open]')) printPreview();
+  }
+});
 import { state } from './state.js';
 import * as login from './pages/login.js';
 import * as home from './pages/home.js';

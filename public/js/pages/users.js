@@ -191,7 +191,7 @@ async function renderUser(app, id) {
   app.innerHTML = `<div class="page-head no-print"><a href="javascript:history.back()" class="btn btn-ghost">← Retour</a>
       <div class="row"><button class="btn" id="edit">✏️ Modifier</button>
       ${u.class_id ? `<a class="btn" href="#/classe/${u.class_id}">🏫 Fiche de la classe</a>` : ''}
-      <button class="btn" onclick="window.print()">🖨️ Imprimer la fiche</button>
+      <button class="btn" onclick="bcdPrint()">🖨️ Imprimer la fiche</button>
       <a class="btn btn-primary" href="#/prets" id="lend">📤 Prêter un livre</a></div></div>
     <p class="print-only small">${esc(state.info.school_name)} — Bibliothèque — fiche du ${new Date().toLocaleDateString('fr-FR')}</p>
     <div class="card"><div class="borrower" style="margin:0"><span class="avatar-lg">${esc(u.avatar)}</span>
@@ -237,7 +237,7 @@ async function renderClassSheet(app, id) {
   app.innerHTML = `<div class="page-head no-print"><a href="javascript:history.back()" class="btn btn-ghost">← Retour</a>
       <div class="row"><select id="cls" style="width:auto">${classes.map((c) => `<option value="${c.id}" ${c.id === cls.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
         <a class="btn" href="#/cartes?class_id=${cls.id}">🪪 Cartes de connexion</a>
-        <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimer</button></div></div>
+        <button class="btn btn-primary" onclick="bcdPrint()">🖨️ Imprimer</button></div></div>
     <div class="card">
       <h1 style="margin-bottom:.2rem">🏫 ${esc(cls.name)}</h1>
       <p class="muted">${esc(state.info.school_name)}${cls.teacher_name ? ` · ${esc(cls.teacher_name)}` : ''} ·
@@ -396,7 +396,7 @@ async function renderCards(app, query) {
   const cls = classes.find((c) => String(c.id) === String(classId));
   app.innerHTML = `<div class="page-head no-print"><h1>Cartes de connexion</h1>
       <div class="row"><select id="cls" style="width:auto">${classes.map((c) => `<option value="${c.id}" ${String(c.id) === String(classId) ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
-      <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimer</button></div></div>
+      <button class="btn btn-primary" onclick="bcdPrint()">🖨️ Imprimer</button></div></div>
     ${tabs('cards')}
     <p class="muted no-print">Chaque élève choisit sa classe, touche son avatar puis, s'il en a un, tape son code secret. Découpez et distribuez les cartes.</p>
     ${full.length ? `<div class="cards-print">${full.map((u) => `<div class="login-card">

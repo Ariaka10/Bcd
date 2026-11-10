@@ -147,3 +147,49 @@ export async function uploadCover(docId, blob) {
   if (!res.ok) throw new Error(data.error ?? 'Envoi impossible');
   return data;
 }
+
+/**
+ * Aperçu avant impression : la page telle qu'elle sortira sur papier (format A4), avec le choix
+ * portrait / paysage, puis « Imprimer » ouvre la fenêtre d'impression de Windows.
+ */
+let printCss = null;
+export async function printPreview() {
+  const view = document.querySelector('#app > div') ?? document.querySelector('#app');
+  // Les styles « impression » sont appliqués à l'aperçu (@media print → toujours).
+  printCss ??= (await (await fetch('/style.css')).text()).replace(/@media print/g, '@media all');
+  const title = document.querySelector('#app h1')?.textContent?.trim() || document.title;
+  const dlg = modal(`Aperçu avant impression — ${title}`, `
+    <div class="print-toolbar">
+      <label class="check"><input type="radio" name="orient" value="portrait" checked> Portrait</label>
+      <label class="check"><input type="radio" name="orient" value="landscape"> Paysage</label>
+      <span class="grow"></span>
+      <button type="button" class="btn" data-close>Annuler</button>
+      <button type="button" class="btn btn-primary" id="do-print">🖨️ Imprimer</button></div>
+    <div class="print-stage"><iframe class="print-sheet" title="Aperçu"></iframe></div>
+    <div class="actions"><button type="button" class="btn" data-close>Annuler</button>
+      <button type="button" class="btn btn-primary btn-lg" id="do-print-2">🖨️ Imprimer</button></div>`, { wide: true });
+  dlg.classList.add('modal-print');
+  const frame = dlg.querySelector('iframe');
+  const write = (orient) => {
+    const landscape = orient === 'landscape';
+    frame.style.width = landscape ? '297mm' : '210mm';
+    frame.style.minHeight = landscape ? '210mm' : '297mm';
+    frame.srcdoc = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${esc(title)}</title>
+      <style>${printCss}</style>
+      <style>@page { size: A4 ${orient}; margin: 12mm; }
+        html, body { background: #fff; } body { margin: 0; padding: 12mm; font-size: 12px; }
+        @media print { body { padding: 0; } }</style></head>
+      <body data-role="${esc(document.body.dataset.role ?? '')}"><main class="app">${view.innerHTML}</main></body></html>`;
+  };
+  write('portrait');
+  // Ajuste la hauteur de la feuille au contenu (plusieurs pages à la suite).
+  frame.onload = () => {
+    const doc = frame.contentDocument;
+    if (doc?.body) frame.style.height = `${Math.max(doc.documentElement.scrollHeight, frame.offsetWidth * 1.41)}px`;
+  };
+  for (const r of dlg.querySelectorAll('input[name=orient]')) r.onchange = () => write(r.value);
+  const go = () => frame.contentWindow.print();
+  dlg.querySelector('#do-print').onclick = go;
+  dlg.querySelector('#do-print-2').onclick = go;
+  return dlg;
+}

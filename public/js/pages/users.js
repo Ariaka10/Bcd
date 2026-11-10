@@ -7,7 +7,8 @@ let avatarsCache;
 const avatars = async () => (avatarsCache ??= await api.get('/meta/avatars'));
 
 export async function render(app, { path, params, query }) {
-  if (path === '/import') return renderImport(app);
+  if (path === '/import') return renderImport(app, query);
+  if (path.startsWith('/classe/')) return renderClassSheet(app, params[0]);
   if (path === '/classes') return renderClasses(app);
   if (path === '/cartes') return renderCards(app, query);
   if (params.length) return renderUser(app, params[0]);
@@ -35,6 +36,7 @@ async function renderList(app, query) {
 
   app.innerHTML = `<div class="page-head"><h1>Usagers</h1>
       <div class="row">${isAdmin() ? '<a class="btn" href="#/import">📥 Importer des élèves</a>' : ''}
+        ${query.class_id && query.class_id !== 'none' ? `<a class="btn" href="#/classe/${query.class_id}">🏫 Fiche de la classe</a>` : ''}
         <a class="btn" href="#/cartes${qs({ class_id: query.class_id })}">🪪 Cartes de connexion</a>
         <button class="btn btn-primary" id="add">➕ Nouvel usager</button></div></div>
     ${tabs('list')}
@@ -175,11 +177,23 @@ function splitCode(code, symbols) {
 
 /* ---------- Fiche usager ---------- */
 
+/** Début de l'année scolaire en cours (1er septembre). */
+function schoolYearStart() {
+  const d = new Date();
+  const y = d.getMonth() >= 8 ? d.getFullYear() : d.getFullYear() - 1;
+  return { start: `${y}-09-01`, label: `${y}-${y + 1}` };
+}
+
 async function renderUser(app, id) {
   const [u, classes] = await Promise.all([api.get(`/users/${id}`), api.get('/classes')]);
-  app.innerHTML = `<div class="page-head"><a href="javascript:history.back()" class="btn btn-ghost">← Retour</a>
+  const { start, label } = schoolYearStart();
+  const thisYear = u.history.filter((l) => l.loaned_at >= start);
+  app.innerHTML = `<div class="page-head no-print"><a href="javascript:history.back()" class="btn btn-ghost">← Retour</a>
       <div class="row"><button class="btn" id="edit">✏️ Modifier</button>
+      ${u.class_id ? `<a class="btn" href="#/classe/${u.class_id}">🏫 Fiche de la classe</a>` : ''}
+      <button class="btn" onclick="window.print()">🖨️ Imprimer la fiche</button>
       <a class="btn btn-primary" href="#/prets" id="lend">📤 Prêter un livre</a></div></div>
+    <p class="print-only small">${esc(state.info.school_name)} — Bibliothèque — fiche du ${new Date().toLocaleDateString('fr-FR')}</p>
     <div class="card"><div class="borrower" style="margin:0"><span class="avatar-lg">${esc(u.avatar)}</span>
       <div><h1 style="margin:0">${esc(u.first_name)} ${esc(u.last_name)}</h1>
       <span class="muted">${ROLES[u.role]}${u.class_name ? ' · ' + esc(u.class_name) : ''}${u.birth_date ? ' · né(e) le ' + fmtDate(u.birth_date) : ''}
@@ -187,17 +201,60 @@ async function renderUser(app, id) {
     ${u.reservations?.length ? `<div class="card"><h2 style="margin-top:0">🔖 Réservations</h2><ul class="log">${u.reservations.map((r) =>
       `<li class="${r.status === 'prete' ? 'warn' : ''}"><a href="#/document/${r.document_id}">${esc(r.title)}</a> —
         ${r.status === 'prete' ? '<b>mis de côté, à lui remettre</b>' : 'en attente du retour'}</li>`).join('')}</ul></div>` : ''}
-    <div class="card"><h2 style="margin-top:0">Prêts en cours (${u.loans.length})</h2>
+    <div class="card"><h2 style="margin-top:0">📖 Livres empruntés en ce moment (${u.loans.length})</h2>
       ${u.loans.length ? `<ul class="log">${u.loans.map((l) => `<li class="${l.overdue ? 'err' : ''}">
-        <a href="#/document/${l.document_id}">${esc(l.title)}</a> <span class="cote small">${esc(l.cote ?? '')}</span>
+        <a href="#/document/${l.document_id}">${esc(l.title)}</a> <span class="muted small">n° ${esc(l.barcode ?? '')}</span>
         — prêté le ${fmtDate(l.loaned_at)}, ${l.overdue ? `<b>en retard de ${plural(l.days_late, 'jour')}</b>` : `à rendre le ${fmtDate(l.due_at)}`}
-        <button class="btn btn-sm ret" data-id="${l.id}" style="float:right">Retour</button></li>`).join('')}</ul>` : '<p class="muted">Aucun.</p>'}</div>
-    <div class="card"><h2 style="margin-top:0">Historique</h2>
-      ${u.history.length ? `<div class="table-wrap"><table><thead><tr><th>Document</th><th>Prêté le</th><th>Rendu le</th></tr></thead><tbody>
-      ${u.history.map((l) => `<tr><td>${esc(l.title)}${l.lost ? ' <span class="badge badge-late">perdu</span>' : ''}</td>
-        <td>${fmtDate(l.loaned_at)}</td><td>${fmtDate(l.returned_at)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Aucun livre rendu pour le moment.</p>'}</div>`;
+        <button class="btn btn-sm ret no-print" data-id="${l.id}" style="float:right">Retour</button></li>`).join('')}</ul>` : '<p class="muted">Aucun.</p>'}</div>
+    <div class="card"><h2 style="margin-top:0">📜 Carnet de lecteur ${esc(label)} <span class="muted small">(${plural(thisYear.length, 'livre lu', 'livres lus')})</span></h2>
+      ${thisYear.length ? `<table class="dense"><thead><tr><th>Livre</th><th>Emprunté le</th><th>Rendu le</th></tr></thead><tbody>
+      ${thisYear.map((l) => `<tr><td>${esc(l.title)}${l.lost ? ' <span class="badge badge-late">perdu</span>' : ''}</td>
+        <td>${fmtDate(l.loaned_at)}</td><td>${fmtDate(l.returned_at)}</td></tr>`).join('')}</tbody></table>`
+        : '<p class="muted">Aucun livre rendu cette année pour le moment.</p>'}</div>
+    ${u.history.length > thisYear.length ? `<details class="card no-print"><summary><b>Années précédentes</b> (${u.history.length - thisYear.length})</summary>
+      <ul>${u.history.filter((l) => l.loaned_at < start).map((l) => `<li>${esc(l.title)} <span class="muted small">— ${fmtDate(l.loaned_at)}</span></li>`).join('')}</ul></details>` : ''}`;
   $('#edit').onclick = () => editUser(u, classes);
   for (const b of $$('.ret')) b.onclick = async () => { await api.post('/loans/return', { loan_id: Number(b.dataset.id) }); toast('Retour enregistré'); navigate(location.hash); };
+}
+
+/* ---------- Fiche classe (imprimable) ---------- */
+
+async function renderClassSheet(app, id) {
+  const classes = await api.get('/classes');
+  const cls = classes.find((c) => c.id === Number(id));
+  if (!cls) { app.innerHTML = '<div class="empty">Classe introuvable.</div>'; return; }
+  const [students, loans] = await Promise.all([
+    api.get(`/users?class_id=${cls.id}&role=eleve`),
+    api.get(`/loans?class_id=${cls.id}&limit=2000`),
+  ]);
+  const byUser = new Map();
+  for (const l of loans) if (l.user_id) (byUser.get(l.user_id) ?? byUser.set(l.user_id, []).get(l.user_id)).push(l);
+  const classLoans = loans.filter((l) => !l.user_id);
+  const late = loans.filter((l) => l.overdue).length;
+  app.innerHTML = `<div class="page-head no-print"><a href="javascript:history.back()" class="btn btn-ghost">← Retour</a>
+      <div class="row"><select id="cls" style="width:auto">${classes.map((c) => `<option value="${c.id}" ${c.id === cls.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+        <a class="btn" href="#/cartes?class_id=${cls.id}">🪪 Cartes de connexion</a>
+        <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimer</button></div></div>
+    <div class="card">
+      <h1 style="margin-bottom:.2rem">🏫 ${esc(cls.name)}</h1>
+      <p class="muted">${esc(state.info.school_name)}${cls.teacher_name ? ` · ${esc(cls.teacher_name)}` : ''} ·
+        ${plural(students.length, 'élève')} · ${plural(loans.length, 'livre')} en prêt${late ? ` · <b class="text-late">${plural(late, 'retard')}</b>` : ''}
+        · le ${new Date().toLocaleDateString('fr-FR')}</p>
+      <table class="dense class-sheet"><thead><tr><th>Élève</th><th>Livre(s) empruntés</th><th>N°</th><th>À rendre le</th><th class="print-only">Rendu ✓</th></tr></thead>
+      <tbody>${students.map((u) => {
+        const list = byUser.get(u.id) ?? [];
+        const name = `<a href="#/usager/${u.id}">${esc(u.avatar)} <b>${esc(u.first_name)}</b> ${esc(u.last_name)}</a>`;
+        if (!list.length) return `<tr><td>${name}</td><td class="muted">—</td><td></td><td></td><td class="print-only"></td></tr>`;
+        return list.map((l, i) => `<tr class="${l.overdue ? 'row-late' : ''}">${i === 0 ? `<td rowspan="${list.length}">${name}</td>` : ''}
+          <td>${esc(l.title)}</td><td>${esc(l.barcode ?? '')}</td>
+          <td class="nowrap">${fmtDate(l.due_at)}${l.overdue ? ` <span class="badge badge-late">+${l.days_late} j</span>` : ''}</td><td class="print-only">☐</td></tr>`).join('');
+      }).join('') || '<tr><td colspan="4" class="muted">Aucun élève dans cette classe.</td></tr>'}</tbody></table>
+      ${classLoans.length ? `<h2>📦 Livres prêtés à toute la classe (${classLoans.length})</h2>
+        <table class="dense"><thead><tr><th>Livre</th><th>N°</th><th>À rendre le</th><th class="print-only">Rendu ✓</th></tr></thead>
+        <tbody>${classLoans.map((l) => `<tr class="${l.overdue ? 'row-late' : ''}"><td>${esc(l.title)}</td><td>${esc(l.barcode ?? '')}</td>
+          <td>${fmtDate(l.due_at)}</td><td class="print-only">☐</td></tr>`).join('')}</tbody></table>` : ''}
+    </div>`;
+  $('#cls').onchange = (e) => navigate(`#/classe/${e.target.value}`);
 }
 
 /* ---------- Classes ---------- */
@@ -209,7 +266,7 @@ async function renderClasses(app) {
   app.innerHTML = `<div class="page-head"><h1>Classes</h1><button class="btn btn-primary" id="add">➕ Nouvelle classe</button></div>
     ${tabs('classes')}
     ${classes.length ? `<div class="table-wrap"><table><thead><tr><th>Classe</th><th>Niveau</th><th>Enseignant</th><th class="num">Élèves</th><th class="num">Prêts en cours</th><th></th></tr></thead>
-    <tbody>${classes.map((c) => `<tr><td><a href="#/usagers?class_id=${c.id}"><b>${esc(c.name)}</b></a></td><td>${esc(c.level ?? '')}</td>
+    <tbody>${classes.map((c) => `<tr><td><a href="#/classe/${c.id}"><b>${esc(c.name)}</b></a> <a class="small" href="#/usagers?class_id=${c.id}">(élèves)</a></td><td>${esc(c.level ?? '')}</td>
       <td>${esc(c.teacher_name ?? '')}</td><td class="num">${c.students}</td><td class="num">${c.active_loans}</td>
       <td class="num nowrap"><button class="icon-btn edit" data-id="${c.id}">✏️</button><button class="icon-btn del" data-id="${c.id}">🗑️</button></td></tr>`).join('')}
     </tbody></table></div>` : '<div class="empty">Aucune classe. Elles sont créées automatiquement lors de l\'import ONDE.</div>'}`;
@@ -243,7 +300,7 @@ async function renderClasses(app) {
 
 /* ---------- Import ONDE / CSV ---------- */
 
-async function renderImport(app) {
+async function renderImport(app, query = {}) {
   const classes = await api.get('/classes');
   app.innerHTML = `<div class="page-head"><h1>Importer des élèves</h1></div>
     ${tabs('import')}
@@ -259,7 +316,7 @@ async function renderImport(app) {
         <label class="span-2">Fichier<input type="file" name="file" accept=".csv,.txt,text/csv" required></label>
         <label>Classe de destination (si le fichier n'a pas de colonne « Classe »)
           <input name="class_name" list="classes" placeholder="Ex. : CP"><datalist id="classes">${classes.map((c) => `<option value="${esc(c.name)}">`).join('')}</datalist></label>
-        <label class="check" style="align-self:end"><input type="checkbox" name="archive_missing">
+        <label class="check" style="align-self:end"><input type="checkbox" name="archive_missing" ${query.rentree ? 'checked' : ''}>
           Archiver les élèves absents du fichier (élèves partis — à utiliser à la rentrée avec la liste complète de l'école)</label>
         <div class="span-2 row"><button class="btn btn-primary">👀 Prévisualiser</button></div>
       </form></div>
@@ -300,7 +357,8 @@ function showReport(r, dry, onConfirm) {
     ${section('Changements de classe', r.moved, 'warn')}
     ${section('Élèves archivés', r.archived)}
     ${dry ? `<div class="actions"><button class="btn btn-primary btn-lg" id="go" ${r.total ? '' : 'disabled'}>✅ Confirmer l'import</button></div>`
-      : '<div class="actions"><a class="btn" href="#/usagers">Voir les usagers</a><a class="btn btn-primary" href="#/cartes">🪪 Imprimer les cartes de connexion</a></div>'}
+      : `<div class="actions">${location.hash.includes('rentree') ? '<a class="btn btn-primary" href="#/rentree">↩️ Revenir à l\'assistant de rentrée</a>' : ''}
+        <a class="btn" href="#/usagers">Voir les usagers</a><a class="btn btn-primary" href="#/cartes">🪪 Imprimer les cartes de connexion</a></div>`}
   </div>`;
   if (dry) $('#go').onclick = onConfirm;
 }

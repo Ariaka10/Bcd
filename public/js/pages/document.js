@@ -354,8 +354,20 @@ function renderForm(app, doc) {
       } else {
         const r = await api.post('/documents', data);
         if (pendingCover) await uploadCover(r.id, pendingCover).catch((e) => toast(e.message, 'error'));
-        toast(`Ajouté — cote ${r.cote}${r.barcodes.length ? ` · n° ${r.barcodes.join(', ')} (à écrire sur le livre)` : ''}`);
-        navigate(again ? '#/document/nouveau' : `#/document/${r.id}`);
+        const next = again ? '#/document/nouveau' : `#/document/${r.id}`;
+        if (!r.barcodes.length) {
+          toast(`Ajouté — cote ${r.cote}`);
+          return navigate(next);
+        }
+        // Le numéro à écrire sur le livre, bien visible.
+        const dlg = modal('Livre enregistré ✅', `<div class="number-box">
+            <p>Écrivez ${r.barcodes.length > 1 ? 'ces numéros sur les exemplaires' : 'ce numéro sur le livre'} :</p>
+            <div class="big-numbers">${r.barcodes.map((b) => `<span>n° ${esc(b)}</span>`).join('')}</div>
+            <p class="muted">Cote à coller sur le dos : <span class="cote">${esc(r.cote)}</span></p></div>
+          <div class="actions"><button class="btn btn-primary btn-lg" data-close autofocus>${again ? '➕ Livre suivant' : 'OK'}</button></div>`);
+        const here = location.hash;
+        // Seulement si l'on est resté sur cette page (fermeture différée par le navigateur).
+        dlg.addEventListener('close', () => { if (location.hash === here) navigate(next); });
       }
     } catch (err) { toast(err.message, 'error'); }
   };

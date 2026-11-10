@@ -10,6 +10,7 @@ import * as users from './pages/users.js';
 import * as lists from './pages/lists.js';
 import * as weeding from './pages/weeding.js';
 import * as settings from './pages/settings.js';
+import * as rentree from './pages/rentree.js';
 import * as eleve from './pages/eleve.js';
 
 
@@ -49,6 +50,8 @@ const ROUTES = [
   [/^\/etiquettes$/, lists, ['admin', 'enseignant']],
   [/^\/desherbage$/, weeding, ['admin']],
   [/^\/parametres$/, settings, ['admin']],
+  [/^\/rentree$/, rentree, ['admin']],
+  [/^\/classe\/(\d+)$/, users, ['admin', 'enseignant']],
   [/^\/mon-compte$/, settings, ['admin', 'enseignant', 'eleve']],
   [/^\/mes-prets$/, eleve, ['eleve']],
 ];
@@ -75,6 +78,7 @@ function renderNav() {
     await api.post('/logout');
     state.user = null;
     state.settings = null;
+    state.rentreeShown = false;
     $('#toasts').innerHTML = '';
     location.hash = '#/connexion';
   };
@@ -106,16 +110,27 @@ async function route() {
 
   renderNav();
   checkUpdate();
+  // Première ouverture de l'année scolaire : l'administrateur est conduit une fois vers l'assistant de rentrée.
+  if (path === '/' && state.user.role === 'admin' && !state.rentreeShown) {
+    state.rentreeShown = true;
+    const rem = await api.get('/admin/reminders').catch(() => ({}));
+    if (rem.rentree) { location.hash = '#/rentree'; return; }
+  }
   const params = path.match(re).slice(1);
   let page = mod;
   if (path === '/') page = state.user.role === 'eleve' ? eleve : home;
-  app.innerHTML = '<div class="loading">Chargement…</div>';
+  // Chaque page s'affiche dans son propre cadre : si l'on change de page pendant un chargement,
+  // l'ancien cadre est retiré et la page en retard ne peut plus recouvrir la nouvelle.
+  const view = document.createElement('div');
+  view.innerHTML = '<div class="loading">Chargement…</div>';
+  app.replaceChildren(view);
   try {
-    await page.render(app, { path, params, query, isCurrent: () => id === renderId });
-    window.scrollTo(0, 0);
+    await page.render(view, { path, params, query, isCurrent: () => id === renderId });
+    if (id === renderId) window.scrollTo(0, 0);
   } catch (e) {
+    if (id !== renderId) return; // page abandonnée : erreur sans importance
     console.error(e);
-    if (id === renderId) app.innerHTML = `<div class="empty">⚠️ ${esc(e.message)}</div>`;
+    view.innerHTML = `<div class="empty">⚠️ ${esc(e.message)}</div>`;
   }
 }
 

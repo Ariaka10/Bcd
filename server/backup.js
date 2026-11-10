@@ -103,3 +103,30 @@ export function restoreFrom(db, file, { safetyDir } = {}) {
   }
   return info;
 }
+
+/**
+ * Dossier de sauvegarde supplémentaire (clé USB…). Une clé peut changer de lettre d'un jour à l'autre
+ * (E:, F:…) : si le chemin enregistré n'existe pas, on cherche le même dossier sur les autres lecteurs.
+ */
+export function resolveExtraDir(dir) {
+  if (!dir) return null;
+  if (fs.existsSync(dir)) return dir;
+  const m = dir.match(/^[A-Za-z]:([\\/].*)$/);
+  if (process.platform === 'win32' && m) {
+    for (const letter of 'DEFGHIJKLMNOPQRSTUVWXYZ') {
+      const candidate = `${letter}:${m[1]}`;
+      if (fs.existsSync(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
+/** Copie une sauvegarde dans le dossier supplémentaire (10 gardées). Renvoie le fichier, ou null si absent. */
+export function copyToExtraDir(db, dir) {
+  const target = resolveExtraDir(dir);
+  if (!target) return null;
+  const file = autoBackup(db, target, { keep: 10, prefix: 'bcd-auto' });
+  db.prepare(`INSERT INTO settings (key, value) VALUES ('extra_backup_last', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(new Date().toISOString());
+  return file;
+}

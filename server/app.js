@@ -26,9 +26,9 @@ function loadUser(db, token) {
  * Options : `lookupIsbn` (recherche de notices, remplaçable pour les tests),
  * `backupDir` (dossier des sauvegardes automatiques, version bureau).
  */
-export function createApp(db, { lookupIsbn, backupDir, appInfo, installUpdate, checkUpdate } = {}) {
+export function createApp(db, { lookupIsbn, backupDir, appInfo, installUpdate, checkUpdate, chooseFolder } = {}) {
   const router = new Router();
-  const deps = { lookupIsbn, backupDir, appInfo, installUpdate, checkUpdate };
+  const deps = { lookupIsbn, backupDir, appInfo, installUpdate, checkUpdate, chooseFolder };
   authRoutes(router, deps);
   documentRoutes(router, deps);
   loanRoutes(router, deps);

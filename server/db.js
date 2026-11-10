@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS users (
   sex TEXT,
   ine TEXT,
   active INTEGER NOT NULL DEFAULT 1,
+  archived_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_users_class ON users(class_id);
@@ -152,6 +153,13 @@ CREATE TABLE IF NOT EXISTS reservations (
 );
 CREATE INDEX IF NOT EXISTS idx_reservations_doc ON reservations(document_id, status);
 
+-- Date d'archivage d'un usager (élève parti), tenue à jour automatiquement.
+CREATE TRIGGER IF NOT EXISTS users_archived AFTER UPDATE OF active ON users
+  WHEN NEW.active IS NOT OLD.active
+BEGIN
+  UPDATE users SET archived_at = CASE WHEN NEW.active = 0 THEN datetime('now') ELSE NULL END WHERE id = NEW.id;
+END;
+
 -- Couvertures ajoutées à la main (photo, image du PC), stockées dans la base pour fonctionner sans Internet.
 CREATE TABLE IF NOT EXISTS covers (
   document_id INTEGER PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
@@ -175,7 +183,16 @@ export const DEFAULT_SETTINGS = {
   max_loans_classe: '40',
   // 1 : les élèves ne voient que les livres rangés dans un thème « visible par les élèves »
   restrict_student_catalog: '0',
+  // Sauvegarde supplémentaire (clé USB…) : dossier choisi et date de la dernière copie
+  extra_backup_dir: '',
+  extra_backup_last: '',
 };
+
+/** Année scolaire en cours : « 2026-2027 » de septembre 2026 à août 2027. */
+export function currentSchoolYear(d = new Date()) {
+  const y = d.getMonth() >= 8 ? d.getFullYear() : d.getFullYear() - 1;
+  return `${y}-${y + 1}`;
+}
 
 export function openDb(file) {
   if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -193,6 +210,10 @@ const columns = (db, table) => db.prepare(`PRAGMA table_info(${table})`).all().m
 /** Met à niveau une base créée par une version précédente (avant création des nouvelles tables). */
 function migrateSchema(db) {
   const tables = new Set(db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all().map((t) => t.name));
+  if (tables.has('users') && !columns(db, 'users').includes('archived_at')) {
+    db.exec('ALTER TABLE users ADD COLUMN archived_at TEXT');
+    db.exec(`UPDATE users SET archived_at = datetime('now') WHERE active = 0`);
+  }
   if (tables.has('documents') && !columns(db, 'documents').includes('keywords')) {
     db.exec('ALTER TABLE documents ADD COLUMN keywords TEXT');
   }
@@ -223,6 +244,9 @@ function migrateSchema(db) {
 export function ensureDefaults(db) {
   const ins = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
   for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) ins.run(k, v);
+  // Année scolaire pour laquelle l'assistant de rentrée a été fait : une nouvelle installation
+  // (ou une mise à jour en cours d'année) n'a pas besoin de l'assistant avant la prochaine rentrée.
+  ins.run('school_year_done', currentSchoolYear());
   db.exec('CREATE INDEX IF NOT EXISTS idx_loans_class ON loans(class_id)');
   // v1.1 : numéros d'exemplaire simples (1, 2, 3…) au lieu de « BCD000001 ».
   const old = db.prepare(`SELECT id, barcode FROM copies WHERE barcode GLOB 'BCD[0-9][0-9][0-9][0-9][0-9][0-9]'`).all();

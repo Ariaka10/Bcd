@@ -343,3 +343,18 @@ a.kid-loan { text-decoration: none; color: inherit; }
 .cover-actions { display: grid; gap: .3rem; margin-top: .5rem; }
 .cover-box { display: grid; grid-template-columns: 110px 1fr; gap: .8rem; align-items: start; }
 .map-table select { width: auto; min-width: 14rem; }
+
+/* v1.3 : rentrée, fiches, numéro du livre */
+.reminder { display: block; margin-bottom: 1rem; background: var(--warn-soft); text-decoration: none; color: var(--text); border-color: #f0d9a8; }
+.step h2 { margin-top: 0; }
+.row-late td { background: var(--danger-soft); }
+.text-late { color: var(--danger); }
+.class-sheet td { vertical-align: top; }
+.number-box { text-align: center; }
+.big-numbers { display: flex; gap: .8rem; justify-content: center; flex-wrap: wrap; margin: .8rem 0; }
+.big-numbers span { font-size: 2.6rem; font-weight: 800; padding: .3rem 1rem; border: 3px dashed var(--accent); border-radius: 14px; }
+@media print {
+  th.print-only, td.print-only { display: table-cell; }
+  .class-sheet a { text-decoration: none; }
+}
+.home-grid { align-items: start; }

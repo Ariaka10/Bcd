@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from '../server/db.js';
 import { createApp } from '../server/app.js';
-import { autoBackup, backupFileName } from '../server/backup.js';
+import { autoBackup, backupFileName, copyToExtraDir } from '../server/backup.js';
 import { setFetch } from '../server/notice.js';
 import { DatabaseSync } from 'node:sqlite';
 import { checkForUpdate, updateInfo, installUpdate } from './updater.js';
@@ -69,6 +69,13 @@ async function start() {
     appInfo: updateInfo,
     installUpdate,
     checkUpdate: checkForUpdate,
+    chooseFolder: async () => {
+      const r = await dialog.showOpenDialog(win, {
+        title: 'Choisir le dossier de sauvegarde (clé USB…)',
+        properties: ['openDirectory', 'createDirectory'],
+      });
+      return r.canceled ? null : r.filePaths[0];
+    },
   }));
   await new Promise((resolve, reject) => {
     server.once('error', reject);
@@ -104,7 +111,16 @@ async function start() {
   });
   win.on('closed', () => { win = null; });
 
-  await win.loadURL(origin + '/');
+  // Le tout premier chargement peut échouer si l'ordinateur est encore occupé au démarrage : on réessaie.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await win.loadURL(origin + '/');
+      break;
+    } catch (e) {
+      if (attempt >= 4) throw e;
+      await new Promise((r) => setTimeout(r, 700 * attempt));
+    }
+  }
   if (SMOKE_TEST) return smokeTest(origin);
 
   // Nouvelle version ? Vérification au démarrage puis une fois par jour.
@@ -186,6 +202,13 @@ app.on('before-quit', () => {
   if (backedUpOnQuit || !db) return;
   backedUpOnQuit = true;
   backup('fermeture');
+  // Copie sur la clé USB (ou autre dossier choisi), si elle est branchée.
+  try {
+    const dir = db.prepare(`SELECT value FROM settings WHERE key = 'extra_backup_dir'`).get()?.value;
+    if (dir && hasData()) copyToExtraDir(db, dir);
+  } catch (e) {
+    console.error('Copie sur la clé impossible :', e);
+  }
   server?.close();
   db.close();
 });

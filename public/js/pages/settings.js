@@ -35,8 +35,10 @@ export async function render(app, { path }) {
       <button class="btn" id="repair">🩹 Chercher les textes à réparer</button>
       <div id="repair-result"></div></div>
     <div class="card" id="backups"></div>
+    <div class="card" id="extra"></div>
     <div class="card" id="version"></div>`;
   renderBackups();
+  renderExtra();
   renderVersion();
   $('#f').onsubmit = async (e) => {
     e.preventDefault();
@@ -111,6 +113,7 @@ function restored(r) {
 
 async function renderBackups() {
   const box = $('#backups');
+  if (!box) return; // page quittée entre-temps
   const { dir, items } = await api.get('/admin/backups');
   box.innerHTML = `<h2 style="margin-top:0">💾 Sauvegardes</h2>
     <p class="muted">Toutes les données de la BCD (catalogue, élèves, prêts, listes) tiennent dans un seul fichier.
@@ -129,7 +132,7 @@ async function renderBackups() {
           <td class="num"><button class="btn btn-sm restore" data-name="${esc(b.name)}">Restaurer</button></td></tr>`).join('')}</tbody></table></div>`
         : '<p class="muted">Aucune pour le moment.</p>'}` : ''}`;
 
-  $('#restore-file').onchange = async (e) => {
+  $('#restore-file', box).onchange = async (e) => {
     const file = e.target.files[0];
     e.target.value = '';
     if (!file || !(await confirmBox(`Restaurer « ${file.name} » ? ${WARN}`, { danger: true, ok: 'Restaurer' }))) return;
@@ -140,7 +143,7 @@ async function renderBackups() {
       restored(data);
     } catch (err) { toast(err.message, 'error'); }
   };
-  const now = $('#backup-now');
+  const now = $('#backup-now', box);
   if (now) now.onclick = async () => {
     try { await api.post('/admin/backups'); toast('Sauvegarde enregistrée'); renderBackups(); } catch (err) { toast(err.message, 'error'); }
   };
@@ -156,6 +159,7 @@ async function renderBackups() {
 
 async function renderVersion() {
   const box = $('#version');
+  if (!box) return; // page quittée entre-temps
   const info = await api.get('/app/info').catch(() => ({ desktop: false }));
   if (!info.desktop) { box.remove(); return; }
   const u = info.update;
@@ -170,7 +174,7 @@ async function renderVersion() {
       <button class="btn" id="check">🔁 Vérifier maintenant</button></div>
     <p class="small muted">L'application vérifie seule les nouvelles versions au démarrage. Si l'ordinateur bloque l'installation automatique,
       téléchargez la nouvelle version depuis la page GitHub (installateur ou fichier zip).</p>`;
-  const install = $('#install');
+  const install = $('#install', box);
   if (install) install.onclick = async () => {
     install.disabled = true;
     install.textContent = 'Téléchargement…';
@@ -183,8 +187,52 @@ async function renderVersion() {
       install.textContent = 'Réessayer';
     }
   };
-  $('#check').onclick = async () => {
+  $('#check', box).onclick = async () => {
     await api.post('/app/check-update').catch(() => {});
     renderVersion();
   };
+}
+
+/* ---------- Copie sur clé USB ---------- */
+
+async function renderExtra() {
+  const box = $('#extra');
+  if (!box) return; // page quittée entre-temps
+  const [x, info] = await Promise.all([api.get('/admin/extra-backup'), api.get('/app/info').catch(() => ({}))]);
+  const when = x.last ? `${fmtDate(x.last)} à ${new Date(x.last).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'jamais';
+  box.innerHTML = `<h2 style="margin-top:0">🔑 Copie sur une clé USB</h2>
+    <p class="muted">Si l'ordinateur tombe en panne, les sauvegardes qu'il contient sont perdues avec lui.
+      Choisissez un dossier sur une clé USB : à chaque fermeture de l'application, si la clé est branchée, une sauvegarde y est copiée
+      (les 10 dernières sont gardées). Un rappel s'affiche si aucune copie n'a été faite depuis 7 jours.</p>
+    ${x.dir ? `<p>Dossier : <code>${esc(x.dir)}</code>
+        ${x.available ? `<span class="badge badge-ok">✅ branchée${x.resolved !== x.dir ? ` (en ${esc(x.resolved.slice(0, 2))})` : ''}</span>`
+          : '<span class="badge badge-late">clé non branchée</span>'}<br>
+        Dernière copie : <b>${when}</b>${x.days_since >= 7 ? ' <span class="badge badge-late">⚠️ pensez à brancher la clé</span>' : ''}</p>`
+      : '<p><span class="badge">Aucun dossier choisi</span></p>'}
+    <div class="row">
+      ${info.desktop ? '<button class="btn btn-primary" id="choose">📁 Choisir le dossier…</button>'
+        : '<input id="dir-input" placeholder="Chemin du dossier, ex. E:\\BCD-sauvegardes" style="max-width:22rem"><button class="btn btn-primary" id="save-dir">Enregistrer</button>'}
+      ${x.dir ? `<button class="btn" id="run" ${x.available ? '' : 'disabled'}>💾 Copier maintenant</button>
+        <button class="btn btn-ghost" id="stop">Ne plus copier</button>` : ''}</div>`;
+
+  const save = async (dir) => {
+    try {
+      const r = await api.put('/admin/extra-backup', { dir });
+      toast(dir ? (r.available ? 'Dossier enregistré — première copie faite ✅' : 'Dossier enregistré') : 'Copie sur clé désactivée');
+      renderExtra();
+    } catch (e) { toast(e.message, 'error'); }
+  };
+  const choose = $('#choose', box);
+  if (choose) choose.onclick = async () => {
+    const { dir } = await api.post('/app/choose-folder');
+    if (dir) save(dir);
+  };
+  const saveDir = $('#save-dir', box);
+  if (saveDir) saveDir.onclick = () => save($('#dir-input', box).value.trim());
+  const run = $('#run', box);
+  if (run) run.onclick = async () => {
+    try { await api.post('/admin/extra-backup/run'); toast('Copie faite sur la clé ✅'); renderExtra(); } catch (e) { toast(e.message, 'error'); }
+  };
+  const stop = $('#stop', box);
+  if (stop) stop.onclick = () => save('');
 }

@@ -408,3 +408,7 @@ th[data-dir=asc] .sort-arrows i:first-child, th[data-dir=desc] .sort-arrows i:la
 
 /* Source de la couverture sous l'image */
 .cover-credit { font-size: .75rem; color: var(--muted); margin: .3rem 0 0; text-align: center; }
+
+/* Écran de connexion : cartes centrées, quel que soit leur nombre */
+#login-step .kid-grid, #login-step .class-grid { display: flex; flex-wrap: wrap; justify-content: center; }
+#login-step .kid-grid > *, #login-step .class-grid > * { flex: 0 1 160px; }

@@ -46,7 +46,13 @@ export function buildSearch(q) {
       ||' '||coalesce(d.keywords,'')`;
     for (const term of normalize(q.q).split(' ').filter(Boolean)) {
       const isbn = toIsbn13(term);
-      if (isbn) { where.push('d.isbn = ?'); args.push(isbn); } else like(all, term);
+      if (isbn) { where.push('d.isbn = ?'); args.push(isbn); }
+      else if (/^\d{1,7}$/.test(term)) {
+        // Un nombre : numéro d'exemplaire (« 12 ») ou texte (cote Dewey, titre…), sans fouiller dans les ISBN.
+        const noIsbn = all.replace("||' '||coalesce(d.isbn,'')", '');
+        where.push(`(d.id IN (SELECT document_id FROM copies WHERE barcode = ?) OR norm(${noIsbn}) LIKE ? ESCAPE '\\')`);
+        args.push(term, likeTerm(term));
+      } else like(all, term);
     }
   }
   if (q.title) like(`coalesce(d.title,'')||' '||coalesce(d.subtitle,'')`, q.title);

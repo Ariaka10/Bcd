@@ -111,9 +111,6 @@ L'application vérifie au démarrage si une nouvelle version est publiée (*Para
 Version installée : « Installer et redémarrer » ; version zip : lien vers la page de téléchargement.
 Les données sont toujours conservées.
 
-> La vérification automatique nécessite un dépôt GitHub **public** ; avec un dépôt privé,
-> on télécharge les nouvelles versions à la main.
-
 ## 🛠️ Pour les développeurs
 
 Il suffit de **Node.js 22.13 ou plus récent** (base SQLite intégrée, aucune dépendance côté serveur).
@@ -145,3 +142,15 @@ public/              interface (HTML, CSS, JavaScript)
 test/                tests automatiques (node:test)
 docs/captures/       captures d'écran (données fictives)
 ```
+
+## ⚖️ Licence
+
+BCD est un logiciel libre, distribué sous la **[Licence publique de l'Union européenne (EUPL) v1.2](LICENSE)**.
+Chacun peut l'utiliser, l'étudier, le modifier et le redistribuer gratuitement ; une version modifiée et
+diffusée doit rester sous la même licence (ou une licence compatible), avec son code source.
+
+La licence existe en version officielle française, de même valeur juridique :
+[texte de l'EUPL 1.2 en français](https://eur-lex.europa.eu/legal-content/FR/TXT/?uri=CELEX:32017D0863).
+
+Les couvertures récupérées sur Internet ne sont pas couvertes par cette licence ; celles de la BnF sont
+réutilisables sous Licence ouverte (source citée sous chaque couverture).

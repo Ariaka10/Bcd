@@ -16,7 +16,7 @@
     "app": "electron .",
     "dist:win": "electron-builder --win --x64 --publish never"
   },
-  "license": "MIT",
+  "license": "EUPL-1.2",
   "devDependencies": {
     "electron": "44.10.2",
     "electron-builder": "26.18.0"

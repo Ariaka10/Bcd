@@ -2,6 +2,12 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
+## [Non publié]
+
+### Modifié
+- **Licence** : BCD est désormais distribué sous la **Licence publique de l'Union européenne (EUPL) v1.2**
+  (fichier `LICENSE`, version officielle française disponible sur EUR-Lex).
+
 ## [1.5.3] — 2026-11-11
 
 ### Corrigé

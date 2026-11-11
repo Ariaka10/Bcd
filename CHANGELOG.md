@@ -8,6 +8,7 @@ Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeu
 - **Déconnexion à la fermeture** : fermer l'application déconnecte tous les profils. À la prochaine ouverture,
   on repart de l'écran des cartes (y compris après une coupure de courant ou un arrêt brutal du PC).
 - **Écran de connexion** : les cartes (classes, élèves, adultes) sont centrées.
+- En haut de l'application, l'école 🏫 à côté de son nom (au lieu des livres 📚, déjà utilisés pour « Prêts »).
 
 ### Ajouté
 - **« Tous les livres »** : champ de recherche (titre, auteur, numéro, mot-clé…), résultats au fil de la frappe,

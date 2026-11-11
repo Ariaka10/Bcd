@@ -2,6 +2,12 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
+## [1.5.3] — 2026-11-11
+
+### Corrigé
+- **Déconnexion à la fermeture** : fermer l'application déconnecte tous les profils. À la prochaine ouverture,
+  on repart de l'écran des cartes (y compris après une coupure de courant ou un arrêt brutal du PC).
+
 ## [1.5.2] — 2026-11-11
 
 ### Ajouté

@@ -62,6 +62,8 @@ async function start() {
   const dbFile = path.join(dataDir, 'bcd.sqlite');
   backupBeforeUpgrade(dbFile);
   db = openDb(dbFile);
+  // Personne n'est connecté à l'ouverture : chacun choisit sa carte (fermeture brutale, coupure de courant…).
+  logoutEveryone();
 
   setFetch((url, opts) => net.fetch(url, opts));
   server = http.createServer(createApp(db, {
@@ -202,9 +204,19 @@ function buildMenu() {
 
 app.on('window-all-closed', () => app.quit());
 
+/** Déconnecte tous les profils (les sessions ne survivent pas à la fermeture de l'application). */
+function logoutEveryone() {
+  try {
+    db.exec('DELETE FROM sessions');
+  } catch (e) {
+    console.error('Déconnexion impossible :', e);
+  }
+}
+
 app.on('before-quit', () => {
   if (backedUpOnQuit || !db) return;
   backedUpOnQuit = true;
+  logoutEveryone();
   backup('fermeture');
   // Copie sur la clé USB (ou autre dossier choisi), si elle est branchée.
   try {

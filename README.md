@@ -57,7 +57,8 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
 ### Catalogue
 - **Notices prêtes à l'emploi par ISBN** : catalogue de la **BnF**, complété par Open Library et Google Books
   (couverture, résumé). Doublons détectés, accents abîmés corrigés automatiquement.
-- **Couvertures automatiques** : récupérées à l'enregistrement (BnF, Open Library, Google Books) et gardées sur l'ordinateur,
+- **Couvertures automatiques** : récupérées à l'enregistrement (service officiel de la BnF, Open Library, Google Books,
+  Amazon en option) et gardées sur l'ordinateur,
   donc visibles même sans Internet ; bouton pour chercher en une fois celles des livres déjà enregistrés ou importés.
   Sinon, photo ou image du PC (ou collée avec Ctrl+V).
 - **Cotes calculées automatiquement** : genre + 3 lettres de l'auteur (`A RAM`, `R DAH`, `BD AST`…),

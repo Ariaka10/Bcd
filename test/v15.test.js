@@ -32,8 +32,10 @@ function fakeFetch(url) {
     }
     return Promise.resolve(ok('<srw:searchRetrieveResponse><srw:numberOfRecords>0</srw:numberOfRecords></srw:searchRetrieveResponse>', 'text/xml'));
   }
-  if (url.startsWith('https://catalogue.bnf.fr/couverture')) {
-    return Promise.resolve(url.includes('cb37075409k') ? ok(IMG.A) : notFound());
+  if (url.startsWith('https://openapi.bnf.fr/couverture/')) {
+    // Pas d'EAN connu ici : seule la recherche par identifiant (ark) aboutit ; sinon erreur 500 comme le vrai service.
+    return Promise.resolve(url.includes('idArk=ark:/12148/cb37075409k') ? ok(IMG.A)
+      : new Response('<html>Erreur interne du serveur</html>', { status: 500, headers: { 'Content-Type': 'text/html' } }));
   }
   if (url.startsWith('https://covers.openlibrary.org/')) {
     if (url.includes(ISBN.B)) return Promise.resolve(ok(IMG.B));

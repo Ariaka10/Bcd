@@ -195,6 +195,7 @@ CREATE TABLE IF NOT EXISTS covers (
   data BLOB NOT NULL,
   source TEXT NOT NULL DEFAULT 'manuel',
   hash TEXT,
+  origin TEXT,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS covers_hash ON covers(hash);
@@ -220,6 +221,7 @@ export const DEFAULT_SETTINGS = {
   // Sauvegarde supplémentaire (clé USB…) : dossier choisi et date de la dernière copie
   extra_backup_dir: '',
   extra_backup_last: '',
+  covers_amazon: '0',
 };
 
 /** Année scolaire en cours : « 2026-2027 » de septembre 2026 à août 2027. */
@@ -256,6 +258,11 @@ function migrateSchema(db) {
   addColumn('documents', 'cover_tried_at', 'TEXT');
   addColumn('covers', 'source', "TEXT NOT NULL DEFAULT 'manuel'");
   addColumn('covers', 'hash', 'TEXT');
+  // v1.5.2 : nouvelles sources (BnF officielle, Amazon) → les livres « introuvables » seront recherchés à nouveau.
+  if (tables.has('covers') && !columns(db, 'covers').includes('origin')) {
+    db.exec('ALTER TABLE covers ADD COLUMN origin TEXT');
+    if (columns(db, 'documents').includes('cover_tried_at')) db.exec('UPDATE documents SET cover_tried_at = NULL');
+  }
   addColumn('users', 'password_prompt_done', 'INTEGER NOT NULL DEFAULT 0');
   if (tables.has('users') && !columns(db, 'users').includes('archived_at')) {
     db.exec('ALTER TABLE users ADD COLUMN archived_at TEXT');

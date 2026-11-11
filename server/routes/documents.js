@@ -179,8 +179,9 @@ function addCopies(db, docId, { count = 1, barcodes = [], issue_label = null, is
 }
 
 export function getDocument(db, id, user) {
-  const d = db.prepare(`SELECT d.*, ${AVAILABLE_SQL} AS available_count, ${COPIES_SQL} AS copies_count
-    FROM documents d WHERE d.id = ?`).get(id);
+  const d = db.prepare(`SELECT d.*, ${AVAILABLE_SQL} AS available_count, ${COPIES_SQL} AS copies_count,
+      cv.origin AS cover_origin, cv.updated_at AS cover_date
+    FROM documents d LEFT JOIN covers cv ON cv.document_id = d.id WHERE d.id = ?`).get(id);
   if (!d) throw new HttpError(404, 'Document introuvable');
   const isStaff = user && user.role !== 'eleve';
   d.copies = db.prepare(`

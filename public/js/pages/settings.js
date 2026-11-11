@@ -132,7 +132,7 @@ async function renderCovers() {
   const running = job?.running;
   const pct = job?.total ? Math.round((job.done / job.total) * 100) : 0;
   box.innerHTML = `<h2 style="margin-top:0">🖼️ Couvertures des livres</h2>
-    <p class="muted">À chaque livre enregistré, l'application cherche sa couverture sur Internet (BnF, Open Library, Google Books)
+    <p class="muted">À chaque livre enregistré, l'application cherche sa couverture sur Internet (BnF, Open Library, Google Books${st.amazon ? ', Amazon' : ''})
       et la garde sur l'ordinateur : elle s'affiche ensuite même sans connexion. Seul l'ISBN du livre est envoyé.</p>
     <p>${plural(st.with_cover, 'livre a sa couverture', 'livres ont leur couverture')} sur ${st.total}.
       ${st.to_search ? `<b>${plural(st.to_search, 'livre à chercher', 'livres à chercher')}</b>.` : ''}
@@ -145,9 +145,14 @@ async function renderCovers() {
     : `${job?.finished_at ? `<p class="${job.error ? 'badge badge-late' : 'badge badge-ok'}" style="display:inline-block">
         ${job.error ? esc(job.error) : `${job.stopped ? 'Recherche arrêtée' : 'Recherche terminée'} :
         ${plural(job.found, 'couverture trouvée', 'couvertures trouvées')}, ${plural(job.missing, 'introuvable', 'introuvables')}${job.errors ? `, ${plural(job.errors, 'erreur de connexion', 'erreurs de connexion')}` : ''}.`}</p>` : ''}
+      <label class="check" style="margin:.2rem 0 .6rem"><input type="checkbox" id="covers-amazon" ${st.amazon ? 'checked' : ''}>
+        Chercher aussi sur <b>Amazon</b> en dernier recours</label>
+      <p class="small muted" style="margin-top:-.4rem">Amazon a beaucoup de couvertures d'albums, mais ce n'est pas un service prévu
+        pour les logiciels : il peut bloquer si on lui demande trop d'images (la recherche ralentit alors un peu pour l'éviter).
+        Un livre manqué à cause d'un blocage peut être retenté plus tard.</p>
       <div class="row">
         <button class="btn btn-primary" id="covers-start" ${st.to_search || st.not_found ? '' : 'disabled'}>🔎 Chercher les couvertures manquantes</button>
-        ${st.not_found ? `<label class="check"><input type="checkbox" id="covers-retry" ${st.to_search ? '' : 'checked'}> Réessayer aussi les ${st.not_found} introuvables</label>` : ''}</div>
+        ${st.not_found ? `<label class="check"><input type="checkbox" id="covers-retry" ${st.to_search ? '' : 'checked'}> Réessayer aussi ${st.not_found > 1 ? `les ${st.not_found} introuvables` : 'le livre introuvable'}</label>` : ''}</div>
       <p class="small muted">Un livre à la fois, avec une petite pause (1 à 2 secondes par livre). On peut arrêter et reprendre plus tard.</p>`}`;
 
   const start = $('#covers-start', box);
@@ -156,6 +161,13 @@ async function renderCovers() {
     if (!st.to_search && !retry) return toast('Cochez « Réessayer aussi les introuvables »', 'error');
     await api.post('/admin/covers/start', { retry });
     renderCovers();
+  };
+  const amazon = $('#covers-amazon', box);
+  if (amazon) amazon.onchange = async () => {
+    try {
+      state.settings = await api.put('/settings', { covers_amazon: amazon.checked ? '1' : '0' });
+      toast(amazon.checked ? 'Amazon sera utilisé en dernier recours' : 'Amazon ne sera plus utilisé');
+    } catch (err) { toast(err.message, 'error'); amazon.checked = !amazon.checked; }
   };
   const stop = $('#covers-stop', box);
   if (stop) stop.onclick = async () => { await api.post('/admin/covers/stop'); renderCovers(); };

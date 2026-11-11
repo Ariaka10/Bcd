@@ -2,11 +2,11 @@
  * Couvertures récupérées sur Internet et enregistrées dans la base,
  * pour qu'elles s'affichent même sans connexion et partent avec les sauvegardes.
  *
- * Sources essayées dans l'ordre : catalogue de la BnF, adresse donnée par la notice,
- * Open Library, Google Books. Seul l'ISBN du livre est envoyé.
+ * Sources essayées dans l'ordre : service officiel des couvertures de la BnF, adresse donnée par la notice,
+ * Open Library, Google Books, puis Amazon si l'option est cochée. Seul l'ISBN du livre est envoyé.
  */
 import crypto from 'node:crypto';
-import { tx } from './db.js';
+import { tx, getSettings } from './db.js';
 import { toIsbn13 } from './isbn.js';
 import { fetchWithTimeout, fromBnf } from './notice.js';
 
@@ -60,7 +60,32 @@ async function fetchImage(url) {
   return { mime: info.mime, data, url };
 }
 
-const bnfCoverUrl = (ark) => `https://catalogue.bnf.fr/couverture?&appName=NE&idArk=${ark}&couverture=1`;
+/**
+ * Service officiel des couvertures de la BnF (Licence ouverte : la source est citée sous la couverture).
+ * Sans couverture, il répond par une erreur 500 : c'est normal, on passe à la source suivante.
+ */
+const BNF_COVERS = 'https://openapi.bnf.fr/couverture/image/image/recupererImage';
+const bnfCover = (param) => `${BNF_COVERS}?${param}&couverture=1&taille=originale&largeur=400&hauteur=600`;
+
+/** ISBN-10 (les ISBN en 979 n'en ont pas) : c'est la référence des images Amazon. */
+export function isbn10(isbn13) {
+  if (!/^978\d{10}$/.test(isbn13 ?? '')) return null;
+  const core = isbn13.slice(3, 12);
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += (10 - i) * Number(core[i]);
+  const check = (11 - (sum % 11)) % 11;
+  return core + (check === 10 ? 'X' : String(check));
+}
+
+/** Nom de la source d'après l'adresse de l'image (affiché sous la couverture). */
+export function originOf(url) {
+  const host = (String(url).match(/^https?:\/\/([^/]+)/) || [])[1] ?? '';
+  if (host.endsWith('bnf.fr')) return 'bnf';
+  if (host.endsWith('openlibrary.org')) return 'openlibrary';
+  if (host.includes('google')) return 'google';
+  if (host.includes('amazon')) return 'amazon';
+  return 'internet';
+}
 
 const arkOf = (s) => (String(s ?? '').match(/ark:\/12148\/\w+/) || [])[0];
 
@@ -68,12 +93,14 @@ const arkOf = (s) => (String(s ?? '').match(/ark:\/12148\/\w+/) || [])[0];
  * Sources à essayer, de la plus fiable à la moins fiable. Chacune donne une adresse d'image (ou null) ;
  * celles qui demandent une recherche ne sont interrogées que si les précédentes n'ont rien donné.
  */
-function sources(doc) {
+function sources(doc, { amazon = false } = {}) {
   const isbn = toIsbn13(doc.isbn ?? '');
   return [
+    async () => (isbn ? bnfCover(`EAN=${isbn}`) : null),
     async () => {
+      // Notice BnF sans EAN : on passe par son identifiant (ark).
       const ark = arkOf(doc.source_url) ?? (isbn ? arkOf((await fromBnf(isbn))?.source_url) : null);
-      return ark ? bnfCoverUrl(ark) : null;
+      return ark ? bnfCover(`idArk=${ark}`) : null;
     },
     async () => (/^https?:\/\//.test(doc.cover_url ?? '') ? doc.cover_url : null),
     async () => (isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg?default=false` : null),
@@ -84,6 +111,8 @@ function sources(doc) {
       const thumb = (await res.json()).items?.[0]?.volumeInfo?.imageLinks?.thumbnail;
       return thumb ? thumb.replace('http://', 'https://') : null;
     },
+    // Amazon : en dernier recours, seulement si l'option est cochée (pas d'accès officiel, peut bloquer).
+    async () => (amazon && isbn10(isbn) ? `https://images-na.ssl-images-amazon.com/images/P/${isbn10(isbn)}.01.LZZZZZZZ.jpg` : null),
   ];
 }
 
@@ -92,18 +121,18 @@ function sources(doc) {
  * Résultat : { mime, data, url } ; null si aucune source n'en a ;
  * lève une erreur si aucune source n'a pu être jointe (pas d'Internet).
  */
-export async function findCover(doc, isRejected = () => false) {
+export async function findCover(doc, isRejected = () => false, options = {}) {
   const tried = new Set();
   let reached = false;
   let lastError = null;
-  for (const source of sources(doc)) {
+  for (const source of sources(doc, options)) {
     try {
       const url = await source();
       if (!url || tried.has(url)) continue;
       tried.add(url);
       const img = await fetchImage(url);
       reached = true;
-      if (img && !isRejected(hashOf(img.data))) return img;
+      if (img && !isRejected(hashOf(img.data))) return { ...img, origin: originOf(url) };
     } catch (e) {
       lastError = e; // une source ne répond pas : on passe à la suivante
     }
@@ -115,15 +144,17 @@ export async function findCover(doc, isRejected = () => false) {
 export const hashOf = (data) => crypto.createHash('sha1').update(data).digest('hex');
 
 /** Enregistre une couverture dans la base et fait pointer le document vers elle. */
-export function storeCover(db, id, { mime, data, source = 'manuel' }) {
+export function storeCover(db, id, { mime, data, source = 'manuel', origin = null }) {
   tx(db, () => {
-    db.prepare(`INSERT INTO covers (document_id, mime, data, source, hash) VALUES (?, ?, ?, ?, ?)
+    db.prepare(`INSERT INTO covers (document_id, mime, data, source, hash, origin) VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(document_id) DO UPDATE SET mime = excluded.mime, data = excluded.data, source = excluded.source,
-        hash = excluded.hash, updated_at = datetime('now')`).run(id, mime, data, source, hashOf(data));
+        hash = excluded.hash, origin = excluded.origin, updated_at = datetime('now')`).run(id, mime, data, source, hashOf(data), origin);
     // Paramètre « v » : force le navigateur à afficher la nouvelle image.
     db.prepare(`UPDATE documents SET cover_url = ?, updated_at = datetime('now') WHERE id = ?`).run(`/api/documents/${id}/cover?v=${Date.now()}`, id);
   });
 }
+
+export const amazonEnabled = (db) => getSettings(db).covers_amazon === '1';
 
 const isRejectedIn = (db) => (hash) => !!db.prepare('SELECT 1 FROM cover_rejects WHERE hash = ?').get(hash);
 
@@ -157,7 +188,7 @@ export async function fetchCoverFor(db, id, { onRemoved } = {}) {
   if (!doc) return 'missing';
   let img;
   try {
-    img = await findCover(doc, isRejectedIn(db));
+    img = await findCover(doc, isRejectedIn(db), { amazon: amazonEnabled(db) });
   } catch {
     return 'error';
   }
@@ -196,7 +227,8 @@ export function createCoverService(db, { pauseMs = 1000 } = {}) {
   let working = false;
   let job = null;
 
-  const pause = () => new Promise((r) => setTimeout(r, pauseMs));
+  // Pause plus longue quand Amazon est utilisé : il bloque ceux qui vont trop vite.
+  const pause = () => new Promise((r) => setTimeout(r, db.isOpen && amazonEnabled(db) ? pauseMs * 2.5 : pauseMs));
 
   async function work() {
     if (working) return;
@@ -258,7 +290,7 @@ export function createCoverService(db, { pauseMs = 1000 } = {}) {
     },
     status() {
       const { ids, streak, foundIds, ...rest } = job ?? {};
-      return { job: job ? rest : null, ...coverStats(db) };
+      return { job: job ? rest : null, amazon: amazonEnabled(db), ...coverStats(db) };
     },
     /** Pour les tests : attend la fin du travail en cours. */
     async idle() {

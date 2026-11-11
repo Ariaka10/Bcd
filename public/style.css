@@ -405,3 +405,6 @@ th[data-dir=asc] .sort-arrows i:first-child, th[data-dir=desc] .sort-arrows i:la
 /* Recherche dans un tableau */
 .table-search { display: flex; align-items: center; gap: .6rem; margin: .2rem 0 .5rem; }
 .table-search input { max-width: 340px; }
+
+/* Source de la couverture sous l'image */
+.cover-credit { font-size: .75rem; color: var(--muted); margin: .3rem 0 0; text-align: center; }

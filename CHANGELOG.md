@@ -2,6 +2,19 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
+## [1.5.2] — 2026-11-11
+
+### Ajouté
+- **Couvertures de la BnF par son service officiel** (gratuit, Licence ouverte), recherché par ISBN/EAN en premier :
+  bien meilleur pour les livres français. La source et la date sont indiquées sous la couverture, comme le demande la licence.
+- **Option Amazon** (*Paramètres → Couvertures des livres*, décochée par défaut) : en dernier recours, quand aucune autre
+  source n'a l'image. Très complet pour les albums, mais ce n'est pas un service prévu pour les logiciels : la recherche
+  ralentit pour éviter d'être bloquée. Les images vides d'Amazon sont écartées.
+- Sous chaque couverture trouvée sur Internet : sa source (BnF, Open Library, Google Books, Amazon).
+
+### Modifié
+- À la mise à jour, les livres marqués « introuvables » sont remis à chercher, pour profiter des nouvelles sources.
+
 ## [1.5.1] — 2026-11-11
 
 ### Ajouté

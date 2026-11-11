@@ -41,6 +41,7 @@ function renderDetail(app, d) {
         ${isAdmin() ? '<button class="btn btn-danger" id="del">🗑️ Supprimer</button>' : ''}</div></div>
     <div class="card doc-detail">
       <div>${cover(d, 'cover-lg')}
+        ${coverCredit(d)}
         <div class="cover-actions no-print">
           <button class="btn btn-sm" id="set-cover">📷 ${d.cover_url ? 'Changer la couverture' : 'Ajouter une couverture'}</button>
           ${d.cover_url ? '<button class="btn btn-sm btn-ghost" id="rm-cover">Retirer l\'image</button>' : ''}</div></div>
@@ -167,6 +168,16 @@ async function reserveDialog(d) {
     }
   }, 200);
   $('#f', dlg).onsubmit = (e) => e.preventDefault();
+}
+
+const ORIGINS = { bnf: 'BnF', openlibrary: 'Open Library', google: 'Google Books', amazon: 'Amazon' };
+
+/** Source de la couverture (la licence de la BnF demande de la citer, avec la date de récupération). */
+function coverCredit(d) {
+  const name = ORIGINS[d.cover_origin];
+  if (!name) return '';
+  const date = d.cover_date ? ` (${fmtDate(d.cover_date.slice(0, 10))})` : '';
+  return `<p class="cover-credit">Couverture : ${d.cover_origin === 'bnf' ? 'Bibliothèque nationale de France' : name}${date}</p>`;
 }
 
 /** Fiche simplifiée pour les élèves (maternelle) : grande image, avis en émojis, « Je le veux ! ». */

@@ -73,8 +73,12 @@ jobs:
           Write-Host $text
           if (-not $text.StartsWith('OK')) { throw "Échec du démarrage de la version zip" }
 
+      # Copie des fichiers dans « Artifacts » (pratique pour tester une branche). Si le stockage de GitHub
+      # est en panne, on continue : la Release, elle, est publiée par un autre service.
       - name: Mettre les fichiers à disposition
         uses: actions/upload-artifact@v4
+        continue-on-error: true
+        timeout-minutes: 8
         with:
           name: BCD-Windows
           path: |

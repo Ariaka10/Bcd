@@ -2,6 +2,22 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
+## [1.5.0] — 2026-11-11
+
+### Ajouté
+- **Couvertures récupérées automatiquement** : à l'enregistrement d'un livre, l'application cherche sa couverture
+  (catalogue de la **BnF**, puis Open Library et Google Books) et **la garde sur l'ordinateur**.
+  Elle s'affiche ensuite même sans Internet et part avec les sauvegardes. Seul l'ISBN est envoyé.
+- **« Chercher les couvertures manquantes »** (*Paramètres → Couvertures des livres*) : pour les livres déjà
+  enregistrés ou importés d'Hibouthèque. Un livre à la fois avec une pause, barre d'avancement, arrêt et reprise,
+  bilan (« 412 trouvées, 88 introuvables »), option pour réessayer les introuvables. Aussi proposé à la fin d'un import.
+
+### Modifié
+- Les images « pas de couverture » de certains sites et les images vides sont reconnues et écartées
+  (l'icône avec la première lettre reste affichée).
+- Une couverture retirée à la main n'est pas remise automatiquement ; une photo ajoutée à la main n'est jamais remplacée.
+- Sans Internet, rien n'est marqué « introuvable » : la recherche reprendra plus tard.
+
 ## [1.4.0] — 2026-11-11
 
 ### Ajouté

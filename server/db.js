@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS documents (
   keywords TEXT,
   periodicity TEXT,
   subscription_end TEXT,
+  cover_tried_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -192,8 +193,14 @@ CREATE TABLE IF NOT EXISTS covers (
   document_id INTEGER PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
   mime TEXT NOT NULL,
   data BLOB NOT NULL,
+  source TEXT NOT NULL DEFAULT 'manuel',
+  hash TEXT,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS covers_hash ON covers(hash);
+
+-- Images « pas de couverture » renvoyées par certains sites : jamais retenues.
+CREATE TABLE IF NOT EXISTS cover_rejects (hash TEXT PRIMARY KEY);
 `;
 
 export const DEFAULT_SETTINGS = {
@@ -246,6 +253,9 @@ function migrateSchema(db) {
   addColumn('copies', 'issue_date', 'TEXT');
   addColumn('documents', 'periodicity', 'TEXT');
   addColumn('documents', 'subscription_end', 'TEXT');
+  addColumn('documents', 'cover_tried_at', 'TEXT');
+  addColumn('covers', 'source', "TEXT NOT NULL DEFAULT 'manuel'");
+  addColumn('covers', 'hash', 'TEXT');
   addColumn('users', 'password_prompt_done', 'INTEGER NOT NULL DEFAULT 0');
   if (tables.has('users') && !columns(db, 'users').includes('archived_at')) {
     db.exec('ALTER TABLE users ADD COLUMN archived_at TEXT');

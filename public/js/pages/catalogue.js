@@ -409,9 +409,18 @@ function showImportReport(r, dry, onConfirm) {
       <tbody>${r.sample.map((d) => `<tr><td>${esc(d.title)}</td><td>${esc(d.authors ?? '')}</td><td><span class="cote">${esc(d.cote ?? '')}</span></td>
         <td class="small">${esc(typeLabel(d.doc_type))}</td><td class="num">${d.copies}</td></tr>`).join('')}</tbody></table></div>` : ''}
     <div class="actions">${dry ? `<button class="btn btn-primary btn-lg" id="go" ${r.documents ? '' : 'disabled'}>✅ Importer ${plural(r.documents, 'livre')}</button>`
-      : '<a class="btn btn-primary" href="#/inventaire">📚 Voir tous les livres</a>'}</div>
-    ${!dry ? '<p class="muted small">Astuce : les fiches importées n\'ont souvent pas de résumé ni d\'image. Vous pouvez ajouter une couverture depuis la fiche de chaque livre (« 📷 Ajouter une couverture »).</p>' : ''}`;
+      : `<a class="btn btn-primary" href="#/inventaire">📚 Voir tous les livres</a>
+        ${r.documents ? '<button class="btn" id="import-covers">🖼️ Chercher leurs couvertures sur Internet</button>' : ''}`}</div>
+    ${!dry ? '<p class="muted small">Les fiches importées n\'ont souvent pas d\'image : la recherche se fait en arrière-plan, un livre à la fois (suivi dans <a href="#/parametres">Paramètres → Couvertures des livres</a>). Pour un livre sans ISBN, ajoutez une photo depuis sa fiche (« 📷 Ajouter une couverture »).</p>' : ''}`;
   if (dry) $('#go').onclick = (e) => onConfirm(e.target);
+  const covers = $('#import-covers');
+  if (covers) covers.onclick = async () => {
+    try {
+      const st = await api.post('/admin/covers/start', {});
+      covers.disabled = true;
+      covers.textContent = `🔎 Recherche lancée (${st.job?.total ?? 0} livres)`;
+    } catch (err) { toast(err.message, 'error'); }
+  };
 }
 
 /* ---------- Listes ---------- */

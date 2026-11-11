@@ -1,7 +1,7 @@
 {
   "name": "bcd",
   "productName": "BCD",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Gestion de BCD (bibliothèque centre documentaire) pour l'école maternelle et élémentaire : catalogue, notices BnF par ISBN, prêts, élèves (import ONDE), thèmes, réservations, sauvegardes.",
   "author": "BCD",
   "type": "module",

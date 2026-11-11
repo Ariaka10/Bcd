@@ -66,6 +66,7 @@ async function start() {
   setFetch((url, opts) => net.fetch(url, opts));
   server = http.createServer(createApp(db, {
     backupDir,
+    autoCovers: true,
     appInfo: updateInfo,
     installUpdate,
     checkUpdate: checkForUpdate,

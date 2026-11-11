@@ -6,7 +6,7 @@ import { HttpError } from './util.js';
 
 // Ordre sans importance : les clés étrangères sont désactivées pendant la restauration.
 const TABLES = ['settings', 'classes', 'users', 'documents', 'copies', 'loans', 'lists', 'list_items',
-  'themes', 'document_themes', 'reviews', 'reservations', 'covers'];
+  'themes', 'document_themes', 'reviews', 'reservations', 'covers', 'cover_rejects'];
 
 function stamp(d = new Date()) {
   const p = (n) => String(n).padStart(2, '0');

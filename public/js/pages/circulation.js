@@ -1,9 +1,11 @@
 import { api, qs } from '../api.js';
-import { esc, cover, toast, confirmBox, fmtDate, plural, $, $$, debounce } from '../ui.js';
+import { esc, cover, toast, confirmBox, modal, fmtDate, plural, $, $$, debounce } from '../ui.js';
 import { state, navigate } from '../state.js';
 
 // Emprunteur en cours au comptoir : { kind: 'user', ...usager } ou { kind: 'class', id, name, loans }
 let borrower = null;
+// Classe dont on a affiché les avatars : on y revient après chaque prêt pour choisir l'élève suivant.
+let pickedClass = null;
 const log = [];
 
 export async function render(app, { path, query }) {
@@ -70,8 +72,11 @@ async function desk(el) {
   who.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('button', suggest)?.click(); } };
 
   for (const b of $$('.class-pick')) {
-    b.onclick = async () => {
-      const cls = classes.find((c) => c.id === Number(b.dataset.id));
+    b.onclick = () => showClassKids(classes.find((c) => c.id === Number(b.dataset.id)));
+  }
+  async function showClassKids(cls) {
+    pickedClass = cls;
+    {
       const users = await api.get('/users' + qs({ class_id: cls.id, role: 'eleve' }));
       suggest.innerHTML = `<div class="kid-grid" style="grid-template-columns:repeat(auto-fill,minmax(110px,1fr));margin-top:.6rem">
         <button type="button" class="kid-btn class-loan" style="font-size:.95rem;padding:.6rem .3rem;border-style:dashed">
@@ -82,8 +87,17 @@ async function desk(el) {
           ${u.active_loans ? `<span class="badge ${u.overdue_loans ? 'badge-late' : ''}">${u.active_loans} 📖</span>` : ''}</button>`).join('')}</div>`;
       for (const k of $$('.kid-btn[data-id]', suggest)) k.onclick = () => selectUser(k.dataset.id);
       $('.class-loan', suggest).onclick = () => selectClass(cls);
-    };
+    }
   }
+  nextBorrower = async () => {
+    clearBorrower();
+    if (pickedClass) {
+      // Compteurs de prêts à jour sur les avatars
+      const fresh = (await api.get('/classes')).find((c) => c.id === pickedClass.id);
+      if (fresh && $('#who-suggest')) return showClassKids(fresh);
+    }
+    $('#who')?.focus();
+  };
 
   // 2. Livre à prêter : numéro exact ou recherche par titre
   const code = $('#loan-code');
@@ -138,15 +152,67 @@ async function desk(el) {
   else who.focus();
 }
 
+let nextBorrower = () => {};
+
+function clearBorrower() {
+  borrower = null;
+  if (!$('#borrower')) return;
+  $('#borrower').innerHTML = '';
+  $('#loan-code').value = '';
+  $('#book-suggest').innerHTML = '';
+  $('#book-step').hidden = true;
+}
+
+/** Fenêtre de confirmation du prêt ; « Élève suivant » (ou Entrée, ou 5 secondes) remet le comptoir à zéro. */
+function confirmLoan(r) {
+  const forClass = borrower.kind === 'class';
+  const name = forClass ? `Classe ${borrower.name}` : `${borrower.first_name} ${borrower.last_name}`;
+  const firstName = forClass ? 'la classe' : borrower.first_name;
+  const dlg = modal('✅ Livre prêté', `<div class="loan-ok">
+      ${cover(r, 'cover-md')}
+      <div><p class="loan-ok-title">${esc(r.title)}</p>
+        <p class="muted">n° ${esc(r.barcode)}</p>
+        <p class="loan-ok-who"><span class="avatar-lg">${esc(forClass ? '📦' : borrower.avatar)}</span><b>${esc(name)}</b></p>
+        <p>À rendre le <b>${fmtDate(r.due_at)}</b></p></div></div>
+    <div class="actions">
+      <button class="btn" data-same>📖 Un autre livre pour ${esc(firstName)}</button>
+      <button class="btn btn-primary" data-next autofocus>👍 ${forClass ? 'Terminé' : 'Élève suivant'}</button></div>
+    <p class="small muted" data-countdown style="text-align:right;margin:.4rem 0 0">Se ferme tout seul dans <span data-count>5</span> s</p>`);
+  let choice = 'next';
+  let left = 5;
+  const timer = setInterval(() => {
+    left--;
+    const c = dlg.querySelector('[data-count]');
+    if (c) c.textContent = left;
+    if (left <= 0) dlg.close();
+  }, 1000);
+  // Un geste dans la fenêtre arrête le compte à rebours.
+  const stop = () => { clearInterval(timer); dlg.querySelector('[data-countdown]')?.remove(); };
+  dlg.addEventListener('pointerdown', stop, { once: true });
+  dlg.querySelector('[data-same]').onclick = () => { choice = 'same'; dlg.close(); };
+  dlg.querySelector('[data-next]').onclick = () => dlg.close();
+  dlg.addEventListener('close', async () => {
+    clearInterval(timer);
+    if (!$('#borrower') || !borrower) return; // page quittée
+    if (choice === 'same' || forClass) {
+      $('#loan-code').value = '';
+      $('#book-suggest').innerHTML = '';
+      await refreshBorrower();
+      $('#loan-code').focus();
+    } else {
+      nextBorrower();
+    }
+  });
+}
+
 async function lend(target, ignore_reservation = false) {
   if (!borrower) return;
   const who = borrower.kind === 'class' ? { class_id: borrower.id } : { user_id: borrower.id };
   try {
     const r = await api.post('/loans', { ...who, ...target, ignore_reservation });
     addLog('ok', `📤 « ${r.title} » (n° ${r.barcode}) prêté à ${borrowerName()} — retour le ${fmtDate(r.due_at)}`);
-    $('#loan-code').value = '';
-    $('#book-suggest').innerHTML = '';
-    await refreshBorrower();
+    confirmLoan(r);
+    return;
   } catch (err) {
     if (err.code === 'reserved' && await confirmBox(`${err.message}. Le prêter quand même ?`, { ok: 'Prêter quand même' })) {
       return lend(target, true);
@@ -213,9 +279,7 @@ function showBorrower({ avatar, title, sub, loans, reservations }) {
       — ${l.overdue ? `en retard de ${plural(l.days_late, 'jour')}` : `à rendre le ${fmtDate(l.due_at)}`}</span>
       <button class="btn btn-sm give-back" data-loan="${l.id}" style="float:right">Rendre</button></li>`).join('')}</ul>` : ''}`;
   $('#clear-borrower').onclick = () => {
-    borrower = null;
-    $('#borrower').innerHTML = '';
-    $('#book-step').hidden = true;
+    clearBorrower();
     $('#who').focus();
   };
   for (const b of $$('.give-back')) b.onclick = () => giveBack({ loan_id: Number(b.dataset.loan) });

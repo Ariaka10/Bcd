@@ -1,6 +1,6 @@
 /** Catalogue : recherche, « Tous les livres » (inventaire complet) et gestion des thèmes. */
 import { api, qs } from '../api.js';
-import { esc, cover, toast, modal, confirmBox, formData, plural, readTextFile, $, $$ } from '../ui.js';
+import { esc, cover, toast, modal, confirmBox, formData, plural, readTextFile, debounce, $, $$ } from '../ui.js';
 import { state, navigate, isAdmin, typeLabel, loadThemes, themeChips } from '../state.js';
 
 const selected = new Set();
@@ -123,6 +123,7 @@ async function renderInventory(app, query) {
         <button class="btn btn-primary" onclick="bcdPrint()">🖨️ Imprimer</button></div></div>
     ${tabs('all')}
     <form class="row card no-print" id="filters" style="margin-bottom:1rem">
+      <input type="search" name="q" value="${esc(q.q ?? '')}" placeholder="🔎 Titre, auteur, n°, mot-clé…" autocomplete="off" style="flex:1 1 220px;width:auto">
       <select name="theme_id" style="width:auto">${themeOptions(q.theme_id).replace('>Tous<', '>Tous les thèmes<')}</select>
       <select name="doc_type" style="width:auto"><option value="">Tous les types</option>
         ${types.map(([k, t]) => `<option value="${k}" ${q.doc_type === k ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select>
@@ -151,9 +152,19 @@ async function renderInventory(app, query) {
     <div id="selbar"></div>`;
 
   const f = $('#filters');
-  f.onchange = () => navigate('#/inventaire' + qs(formData(f)));
+  const apply = () => navigate('#/inventaire' + qs(formData(f)));
+  f.onchange = (e) => { if (e.target.name !== 'q') apply(); };
+  f.onsubmit = (e) => { e.preventDefault(); apply(); };
+  // Recherche au fil de la frappe ; le curseur reste dans le champ après la mise à jour de la liste.
+  f.q.oninput = debounce(() => { keepSearchFocus = true; apply(); }, 350);
+  if (keepSearchFocus) {
+    keepSearchFocus = false;
+    f.q.focus();
+    f.q.setSelectionRange(f.q.value.length, f.q.value.length);
+  }
   bindSelection(q, res.total);
 }
+let keepSearchFocus = false;
 
 /* ---------- Sélection et actions groupées ---------- */
 

@@ -113,7 +113,7 @@ export function createLoan(db, { user_id, class_id, barcode, copy_id, loaned_by,
       }
     }
 
-    const doc = db.prepare('SELECT id, title FROM documents WHERE id = ?').get(copy.document_id);
+    const doc = db.prepare('SELECT id, title, cover_url FROM documents WHERE id = ?').get(copy.document_id);
     if (copy.issue_label) doc.title = `${doc.title} — ${copy.issue_label}`; // numéro de périodique
     const due = addDays(today, Number(s[`loan_days_${role}`] ?? 14));
     const { lastInsertRowid } = db.prepare(`INSERT INTO loans (copy_id, document_id, doc_title, user_id, class_id, loaned_at, due_at, loaned_by)
@@ -128,7 +128,7 @@ export function createLoan(db, { user_id, class_id, barcode, copy_id, loaned_by,
       // Le livre mis de côté est parti : la réservation repasse en attente.
       db.prepare(`UPDATE reservations SET status = 'attente', ready_at = NULL WHERE id = ?`).run(heldForOthers[heldForOthers.length - 1].id);
     }
-    return { id: Number(lastInsertRowid), due_at: due, title: doc.title, barcode: copy.barcode };
+    return { id: Number(lastInsertRowid), due_at: due, title: doc.title, barcode: copy.barcode, cover_url: doc.cover_url };
   });
 }
 

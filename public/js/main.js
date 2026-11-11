@@ -1,5 +1,6 @@
 import { api } from './api.js';
 import { $, esc, toast, printPreview } from './ui.js';
+import { initTables } from './tables.js';
 
 // Tous les boutons « Imprimer » (et Ctrl+P) ouvrent d'abord l'aperçu avant impression.
 window.bcdPrint = () => printPreview();
@@ -189,3 +190,6 @@ async function start() {
 }
 
 start();
+
+// Tri et recherche dans tous les tableaux.
+initTables();

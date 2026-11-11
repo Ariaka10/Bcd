@@ -67,7 +67,7 @@ async function renderList(app, query) {
       <button class="btn">Filtrer</button><span class="muted">${plural(users.length, 'usager')}</span></form>
     ${users.length || departed.size ? `<div class="table-wrap"><table><thead><tr>
       ${isAdmin() ? '<th><input type="checkbox" id="all"></th>' : ''}<th>Nom</th><th>Profil</th><th>Classe</th><th>Né(e) le</th><th class="num">Prêts</th><th></th></tr></thead>
-      <tbody>${[...departed.values()].map((d) => `<tr class="row-late">
+      <tbody>${[...departed.values()].map((d) => `<tr class="row-late" data-pin>
         ${isAdmin() ? '<td></td>' : ''}
         <td><a href="#/usager/${d.user_id}" style="text-decoration:none">⚠️ <span class="avatar-sm">${esc(d.avatar)}</span>
           <b>${esc(d.last_name)}</b> ${esc(d.first_name)}</a> <span class="badge badge-warn">parti — livre à récupérer</span>

@@ -2,6 +2,17 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
+## [1.5.1] — 2026-11-11
+
+### Ajouté
+- **Confirmation du prêt** : une fenêtre affiche la couverture, le titre, l'enfant et la date de retour.
+  « 👍 Élève suivant » (bouton par défaut, ou fermeture toute seule après 5 secondes) remet le comptoir à zéro
+  et réaffiche les avatars de la classe, avec les compteurs à jour ; « 📖 Un autre livre pour… » garde le même enfant.
+- **Tri des tableaux** : un clic sur le titre d'une colonne trie (▲ croissant, ▼ décroissant, un nouveau clic inverse).
+  Dates, numéros et noms sont triés correctement (sans tenir compte de l'avatar). Les élèves partis avec un livre restent en tête.
+- **« Chercher dans ce tableau »** au-dessus des tableaux de plus de 5 lignes : ne garde que les lignes qui contiennent
+  les mots tapés (sans se soucier des accents), avec le nombre de résultats. **Ctrl+F** place le curseur dans ce champ.
+
 ## [1.5.0] — 2026-11-11
 
 ### Ajouté

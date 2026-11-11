@@ -361,7 +361,7 @@ async function renderImport(app) {
     $('#step2').innerHTML = `<div class="card">
       <h2 style="margin-top:0">Colonnes du fichier</h2>
       <p class="muted">${plural(a.rows, 'ligne')}. Vérifiez à quoi correspond chaque colonne (reconnues automatiquement, corrigez si besoin).</p>
-      <div class="table-wrap"><table class="dense map-table"><thead><tr><th>Colonne du fichier</th><th>Correspond à</th><th>Exemples</th></tr></thead>
+      <div class="table-wrap"><table class="dense map-table" data-no-tools><thead><tr><th>Colonne du fichier</th><th>Correspond à</th><th>Exemples</th></tr></thead>
         <tbody>${a.headers.map((h, i) => `<tr><td><b>${esc(h)}</b></td>
           <td><select class="map" data-i="${i}">${options(a.mapping[i])}</select></td>
           <td class="small muted">${a.sample.map((r) => esc((r[i] ?? '').slice(0, 40))).filter(Boolean).slice(0, 3).join(' · ')}</td></tr>`).join('')}</tbody></table></div>

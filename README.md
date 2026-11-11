@@ -67,12 +67,14 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
 - **Périodiques** : chaque magazine avec ses numéros (prêtables un par un), suivi de l'abonnement ;
   type **Multimédia** pour les CD et DVD.
 - **Recherche** simple (sans se soucier des accents) et avancée ; **Tous les livres** : inventaire complet.
+- **Tous les tableaux** se trient d'un clic sur une colonne (▲▼) et ont un champ « Chercher dans ce tableau » (Ctrl+F).
 - **Import d'un catalogue existant** : Hibouthèque (*Administration → Document → Export des documents en CSV*),
   BCDI, PMB, tableur. Colonnes reconnues automatiquement, aperçu avant import, numéros d'origine conservés.
 - **Désherbage** par lots, **listes thématiques** et **étiquettes** à imprimer, export Excel (CSV).
 
 ### Prêts
 - Comptoir **avec ou sans douchette** : numéro, titre ou ISBN du livre ; retour par numéro, titre ou nom de l'enfant.
+  Chaque prêt est confirmé dans une fenêtre, puis le comptoir est prêt pour l'élève suivant.
 - **Prêt à toute une classe** (lot de livres), **réservations** (par un adulte ou « Je le veux ! » de l'élève),
   livre mis de côté au retour.
 - **Retards** par classe et **mots aux familles** imprimables (prénom de l'enfant, signés par l'enseignant·e, à découper) ; **fin d'année** : listes par classe et date de retour commune.

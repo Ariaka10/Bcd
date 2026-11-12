@@ -5,18 +5,10 @@ import { computeCote, DOC_TYPES } from '../cote.js';
 import { toIsbn13, cleanIsbn } from '../isbn.js';
 import { lookupIsbn as defaultLookup } from '../notice.js';
 import { toCsv } from '../csv.js';
-import { fixMojibake, fixFields } from '../text.js';
+import { fixFields } from '../text.js';
 import { getSettings } from '../db.js';
 import { readTable, guessMapping, importCatalog, IMPORT_FIELDS } from '../catalog-import.js';
-import { storeCover } from '../covers.js';
-
-/** Type d'image d'après ses premiers octets. */
-function imageType(buf) {
-  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
-  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
-  if (buf.subarray(0, 4).toString('latin1') === 'RIFF' && buf.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
-  return null;
-}
+import { storeCover, imageInfo } from '../covers.js';
 
 const DOC_FIELDS = [
   'isbn', 'title', 'subtitle', 'authors', 'publisher', 'pub_year', 'pages', 'series', 'series_number',
@@ -263,8 +255,8 @@ export default function (r, deps) {
     if (!db.prepare('SELECT 1 FROM documents WHERE id = ?').get(params.id)) throw new HttpError(404, 'Document introuvable');
     if (!raw?.length) throw new HttpError(400, 'Image manquante');
     if (raw.length > 3 * 1024 * 1024) throw new HttpError(413, 'Image trop lourde (3 Mo maximum)');
-    const mime = imageType(raw);
-    if (!mime) throw new HttpError(400, 'Format d\'image non reconnu (JPEG, PNG ou WebP)');
+    const mime = imageInfo(raw)?.mime;
+    if (!mime) throw new HttpError(400, 'Format d\'image non reconnu (JPEG, PNG, GIF ou WebP)');
     const id = Number(params.id);
     storeCover(db, id, { mime, data: raw, source: 'manuel' });
     return { ok: true, cover_url: db.prepare('SELECT cover_url FROM documents WHERE id = ?').get(id).cover_url };

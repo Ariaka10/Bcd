@@ -12,7 +12,7 @@ import { createApp } from '../server/app.js';
 import { autoBackup, backupFileName, copyToExtraDir, startPeriodicBackups } from '../server/backup.js';
 import { setFetch } from '../server/notice.js';
 import { DatabaseSync } from 'node:sqlite';
-import { checkForUpdate, updateInfo, installUpdate } from './updater.js';
+import { checkForUpdate, updateInfo, installUpdate, updateProgress } from './updater.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SMOKE_TEST = process.env.BCD_SMOKE_TEST; // chemin d'un fichier de résultat : test automatique
@@ -71,6 +71,7 @@ async function start() {
     autoCovers: true,
     appInfo: updateInfo,
     installUpdate,
+    updateProgress,
     checkUpdate: checkForUpdate,
     chooseFolder: async () => {
       const r = await dialog.showOpenDialog(win, {

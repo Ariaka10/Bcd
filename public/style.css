@@ -445,3 +445,36 @@ th[data-dir=asc] .sort-arrows i:first-child, th[data-dir=desc] .sort-arrows i:la
   .kid-btn, .class-btn { border-width: 2px; }
   .bar-fill, .month-bar { background: Highlight; forced-color-adjust: none; }
 }
+
+/* Espacement entre les blocs qui se suivent (statistiques, grilles, cartes) */
+.grid + .card, .grid + .grid, .card + .grid, .stats + .card, .stats + .grid, .card + details.card,
+.grid + details.card, .stats-more .grid { margin-top: 1rem; }
+.stats-more .stats { margin-bottom: 1rem; }
+
+/* Bouton « Contraste » en bas à gauche */
+.contrast-toggle { position: fixed; left: 12px; bottom: 12px; z-index: 50; display: inline-flex; align-items: center; gap: .35rem;
+  padding: .4rem .7rem; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--text);
+  font: inherit; font-size: .85rem; cursor: pointer; box-shadow: var(--shadow); opacity: .85; }
+.contrast-toggle:hover { opacity: 1; border-color: var(--primary); }
+.contrast-toggle[aria-pressed="true"] { background: var(--text); color: var(--surface); border-color: var(--text); }
+@media (max-width: 700px) { .contrast-toggle span { display: none; } }
+
+/* Contraste élevé (bouton) : écrans pâles ou vieillissants */
+html.high-contrast {
+  --bg: #d6cebc;
+  --surface: #ffffff;
+  --surface-2: #d3cab6;
+  --text: #000000;
+  --muted: #2e2a24;
+  --line: #6b634f;
+  --row-alt: #ebe4d4;
+  --primary: #1d4f42;
+  --primary-soft: #cfe5dc;
+  --shadow: 0 1px 3px rgba(0, 0, 0, .3), 0 4px 14px rgba(0, 0, 0, .15);
+}
+html.high-contrast .card, html.high-contrast .stat, html.high-contrast .table-wrap, html.high-contrast .kid-btn,
+html.high-contrast .class-btn, html.high-contrast .suggest, html.high-contrast input, html.high-contrast select,
+html.high-contrast textarea, html.high-contrast .btn:not(.btn-primary):not(.btn-danger) { border-width: 2px; border-color: var(--line); }
+html.high-contrast th, html.high-contrast td { border-bottom-color: #a39a85; }
+html.high-contrast a { text-decoration-thickness: 2px; }
+html.high-contrast .badge { outline: 1px solid rgba(0, 0, 0, .35); }

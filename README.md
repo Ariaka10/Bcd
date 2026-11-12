@@ -112,7 +112,11 @@ Le détail des nouveautés de chaque version est dans le **[CHANGELOG](CHANGELOG
 ## 🔄 Mises à jour
 
 L'application vérifie au démarrage si une nouvelle version est publiée (*Paramètres → Version et mises à jour*).
-Version installée : « Installer et redémarrer » ; version zip : lien vers la page de téléchargement.
+Un clic sur « Installer et redémarrer » : barre de progression, puis l'application se ferme et se rouvre toute seule.
+- **Version installée** : le nouvel installateur est téléchargé et lancé sans droits administrateur.
+- **Version zip** : seule la partie modifiée est téléchargée (quelques Mo) quand le moteur de l'application n'a pas changé ;
+  sinon, lien vers le nouveau zip.
+
 Les données sont toujours conservées.
 
 ## 🛠️ Pour les développeurs

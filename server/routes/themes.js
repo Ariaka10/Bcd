@@ -1,7 +1,7 @@
 /** Thèmes créés par l'administrateur (« Les animaux », « Noël »…) pour classer et filtrer les livres. */
 import { HttpError } from '../util.js';
 import { getSettings, tx } from '../db.js';
-import { staff, admin, anyUser, catalog } from '../guards.js';
+import { admin, anyUser, catalog } from '../guards.js';
 
 function cleanTheme(body, existing = {}) {
   const t = { ...existing };

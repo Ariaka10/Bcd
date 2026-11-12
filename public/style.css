@@ -1,10 +1,11 @@
 :root {
-  --bg: #f6f4ef;
+  --bg: #e9e4d8;
   --surface: #ffffff;
-  --surface-2: #f1eee6;
+  --surface-2: #e6e0d2;
   --text: #24221f;
-  --muted: #6b665d;
-  --line: #e2ddd2;
+  --muted: #5c574e;
+  --line: #cfc7b6;
+  --row-alt: #f7f4ed;
   --primary: #2f6f5e;
   --primary-ink: #ffffff;
   --primary-soft: #e3f0eb;
@@ -14,7 +15,7 @@
   --warn-soft: #fff3dc;
   --ok-soft: #e4f3e6;
   --radius: 12px;
-  --shadow: 0 1px 2px rgba(40, 30, 10, .06), 0 4px 14px rgba(40, 30, 10, .06);
+  --shadow: 0 1px 2px rgba(40, 30, 10, .12), 0 4px 14px rgba(40, 30, 10, .10);
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --kid-font: "Comic Sans MS", "Chalkboard SE", "Comic Neue", var(--font);
 }
@@ -110,7 +111,8 @@ table { width: 100%; border-collapse: collapse; }
 th, td { padding: .5rem .65rem; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
 th { font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); background: var(--surface-2); font-weight: 600; }
 tr:last-child td { border-bottom: 0; }
-tbody tr:hover { background: #faf8f3; }
+tbody tr:nth-child(even) { background: var(--row-alt); }
+tbody tr:hover { background: var(--primary-soft); }
 td.num, th.num { text-align: right; }
 .clickable { cursor: pointer; }
 
@@ -122,7 +124,7 @@ td.num, th.num { text-align: right; }
 
 /* Statistiques */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .8rem; margin-bottom: 1rem; }
-.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: .9rem 1rem; text-decoration: none; color: inherit; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: .9rem 1rem; text-decoration: none; color: inherit; box-shadow: var(--shadow); }
 .stat b { display: block; font-size: 1.7rem; line-height: 1.1; }
 .stat span { color: var(--muted); font-size: .9rem; }
 .stat-alert b { color: var(--danger); }
@@ -218,7 +220,7 @@ td.num, th.num { text-align: right; }
 .class-grid, .kid-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .8rem; }
 .class-btn { padding: 1.4rem .8rem; font-size: 1.3rem; font-weight: 700; border-radius: 16px; border: 2px solid var(--line); background: var(--surface); cursor: pointer; font-family: var(--kid-font); }
 .class-btn:hover, .kid-btn:hover { border-color: var(--primary); background: var(--primary-soft); }
-.kid-btn { display: grid; place-items: center; gap: .2rem; padding: 1rem .5rem; border-radius: 16px; border: 2px solid var(--line); background: var(--surface); cursor: pointer; font-family: var(--kid-font); font-size: 1.1rem; }
+.kid-btn { display: grid; place-items: center; gap: .2rem; padding: 1rem .5rem; border-radius: 16px; border: 2px solid var(--line); background: var(--surface); cursor: pointer; font-family: var(--kid-font); font-size: 1.1rem; box-shadow: var(--shadow); }
 .kid-btn .avatar { font-size: 3rem; line-height: 1.1; }
 
 /* Espace élève */
@@ -436,3 +438,10 @@ th[data-dir=asc] .sort-arrows i:first-child, th[data-dir=desc] .sort-arrows i:la
 .return-books button { padding: .55rem .6rem; }
 .ret-direct { margin-top: .9rem; padding-top: .7rem; border-top: 1px dashed var(--line); }
 .reserved-alert { background: var(--warn-soft, #fff4d6); border-radius: 8px; padding: .4rem .6rem; font-weight: 600; }
+
+/* Windows en « contraste élevé » : on garde des bordures visibles autour des cartes et des boutons. */
+@media (forced-colors: active) {
+  .card, .stat, .kid-btn, .class-btn, .table-wrap, .suggest, .borrower, .btn, dialog { border: 1px solid CanvasText; }
+  .kid-btn, .class-btn { border-width: 2px; }
+  .bar-fill, .month-bar { background: Highlight; forced-color-adjust: none; }
+}

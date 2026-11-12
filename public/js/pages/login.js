@@ -86,7 +86,8 @@ async function adult() {
     <div class="kid-grid">${adults.map((a) => `<button class="kid-btn adult-btn ${a.role === 'admin' ? 'admin-card' : ''}" data-id="${a.id}"
         data-pwd="${a.needs_password ? 1 : 0}" data-name="${esc(a.first_name)} ${esc(a.initial)}.">
       <span class="avatar">${esc(a.avatar ?? '🙂')}</span><span>${esc(a.first_name)} ${esc(a.initial)}.</span>
-      <span class="small muted">${a.role === 'admin' ? '🔑 Administrateur' : a.needs_password ? '🔒 Enseignant·e' : 'Enseignant·e'}</span></button>`).join('')}</div>
+      <span class="small muted">${a.role === 'admin' ? '🔑 Administrateur' : a.role === 'catalogueur' ? `${a.needs_password ? '🔒' : '📚'} Ajout de livres`
+        : a.needs_password ? '🔒 Enseignant·e' : 'Enseignant·e'}</span></button>`).join('')}</div>
     <div class="actions" style="justify-content:center"><button class="btn btn-ghost" id="back">← Retour</button>
       <button class="btn btn-ghost small" id="by-id">Se connecter avec un identifiant</button></div>`;
   $('#back').onclick = choose;

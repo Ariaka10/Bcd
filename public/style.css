@@ -412,3 +412,27 @@ th[data-dir=asc] .sort-arrows i:first-child, th[data-dir=desc] .sort-arrows i:la
 /* Écran de connexion : cartes centrées, quel que soit leur nombre */
 #login-step .kid-grid, #login-step .class-grid { display: flex; flex-wrap: wrap; justify-content: center; }
 #login-step .kid-grid > *, #login-step .class-grid > * { flex: 0 1 160px; }
+
+/* Statistiques détaillées (accueil) */
+.stats-more > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; }
+.stats-more > summary::-webkit-details-marker { display: none; }
+.stats-more > summary h2 { margin: 0; font-size: 1.15rem; }
+.stats-more > summary::after { content: '▾'; margin-left: auto; color: var(--muted); transition: transform .2s; }
+.stats-more[open] > summary::after { transform: rotate(180deg); }
+.stat b small { font-size: .55em; color: var(--muted); font-weight: 600; }
+.month-chart { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; padding-top: 1.2rem; }
+.month { min-width: 0; text-align: center; }
+.month-plot { height: 150px; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 18%; }
+.month-bar { position: relative; background: var(--primary); border-radius: 4px 4px 0 0; }
+.month:hover .month-bar { filter: brightness(1.2); }
+.month-val { position: absolute; left: 0; right: 0; top: -1.15rem; font-size: .75rem; color: var(--muted); }
+.month-label { display: block; font-size: .72rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: .2rem; }
+.big-action { display: flex; flex-direction: column; align-items: center; gap: .3rem; text-align: center; text-decoration: none; color: inherit; padding: 1.4rem; }
+.big-action > span:first-child { font-size: 2.6rem; }
+.big-action:hover { border-color: var(--primary); background: var(--primary-soft); }
+@media print { .stats-more:not([open]) { display: none; } }
+
+/* Retour : livres de l'enfant en grands boutons */
+.return-books button { padding: .55rem .6rem; }
+.ret-direct { margin-top: .9rem; padding-top: .7rem; border-top: 1px dashed var(--line); }
+.reserved-alert { background: var(--warn-soft, #fff4d6); border-radius: 8px; padding: .4rem .6rem; font-weight: 600; }

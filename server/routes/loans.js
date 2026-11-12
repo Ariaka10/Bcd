@@ -76,6 +76,7 @@ export function createLoan(db, { user_id, class_id, barcode, copy_id, loaned_by,
       user = db.prepare('SELECT * FROM users WHERE id = ?').get(user_id);
       if (!user) throw new HttpError(404, 'Usager introuvable');
       if (!user.active) throw new HttpError(409, 'Compte désactivé');
+      if (user.role === 'catalogueur') throw new HttpError(409, 'Ce compte sert à ajouter des livres : il ne peut pas emprunter');
     }
     const role = cls ? 'classe' : user.role;
 
@@ -156,6 +157,7 @@ export function returnLoan(db, { barcode, loan_id, lost }) {
     const reserved_for = !lost && loan.document_id ? holdForNext(db, loan.document_id) : null;
     return {
       id: loan.id, title: info.title, barcode: info.barcode, first_name: info.first_name, last_name: info.last_name,
+      cover_url: info.cover_url, avatar: info.avatar, user_id: loan.user_id, class_id: loan.class_id,
       due_at: loan.due_at, days_late: Math.max(0, daysBetween(loan.due_at, localDate())), reserved_for,
     };
   });

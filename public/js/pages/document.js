@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { esc, cover, toast, modal, confirmBox, formData, fmtDate, plural, $, $$, debounce, resizeImage, pickImage, uploadCover } from '../ui.js';
-import { state, navigate, isAdmin, typeLabel, loadThemes, themeChips } from '../state.js';
+import { state, navigate, isAdmin, isCataloguer, typeLabel, loadThemes, themeChips } from '../state.js';
 import { addToListDialog } from './catalogue.js';
 
 const STATES = { ok: 'Bon état', abime: 'Abîmé', perdu: 'Perdu', reparation: 'En réparation' };
@@ -35,8 +35,8 @@ function renderDetail(app, d) {
   app.innerHTML = `
     <div class="page-head no-print"><a href="javascript:history.back()" class="btn btn-ghost">← Retour</a>
       <div class="row">
-        <button class="btn" id="reserve">🔖 Réserver pour…</button>
-        <button class="btn" id="to-list">📋 Ajouter à une liste</button>
+        ${isCataloguer() ? '' : `<button class="btn" id="reserve">🔖 Réserver pour…</button>
+        <button class="btn" id="to-list">📋 Ajouter à une liste</button>`}
         <a class="btn" href="#/document/${d.id}/modifier">✏️ Modifier</a>
         ${isAdmin() ? '<button class="btn btn-danger" id="del">🗑️ Supprimer</button>' : ''}</div></div>
     <div class="card doc-detail">
@@ -82,8 +82,8 @@ function renderDetail(app, d) {
         <td class="num">${isAdmin() && !c.loan_id ? `<button class="icon-btn del-copy" data-id="${c.id}" title="Supprimer l'exemplaire">🗑️</button>` : ''}</td>
       </tr>`).join('') || `<tr><td colspan="7" class="muted">${periodical ? 'Aucun numéro : ajoutez le dernier reçu.' : 'Aucun exemplaire'}</td></tr>`}</tbody></table></div></div>`;
 
-  $('#to-list').onclick = () => addToListDialog([d.id]);
-  $('#reserve').onclick = () => reserveDialog(d);
+  if ($('#to-list')) $('#to-list').onclick = () => addToListDialog([d.id]);
+  if ($('#reserve')) $('#reserve').onclick = () => reserveDialog(d);
   $('#set-cover').onclick = async () => {
     const file = await pickImage();
     if (!file) return;

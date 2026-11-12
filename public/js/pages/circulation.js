@@ -50,8 +50,14 @@ async function desk(el) {
       </div>
     </section>
     <section class="card"><h2 style="margin-top:0">📥 Rendre</h2>
-      <label>Numéro du livre, titre ou nom de l'enfant
-        <input id="return-code" class="scan-input" autocomplete="off" placeholder="Ex. : 12, « loup » ou « Léa »"></label>
+      <label>1. Qui rend ?
+        <input id="ret-who" placeholder="Nom ou prénom…" autocomplete="off"></label>
+      <div id="ret-who-suggest"></div>
+      ${classes.length ? `<div class="row small" style="margin-top:.4rem"><span class="muted">ou par classe :</span>
+        ${classes.map((c) => `<button class="btn btn-sm ret-class-pick" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div>` : ''}
+      <div id="returner"></div>
+      <label class="ret-direct">ou directement : <span class="muted small">numéro ou titre du livre</span>
+        <input id="return-code" class="scan-input" autocomplete="off" placeholder="Ex. : 12 ou « loup »"></label>
       <div id="return-suggest"></div>
       <h3>Opérations de la séance</h3>
       <ul class="log" id="log"></ul>
@@ -146,10 +152,169 @@ async function desk(el) {
     else $('button[data-loan]', retSuggest)?.click();
   };
 
+  // Retour en deux étapes, comme le prêt : l'enfant, puis ses livres.
+  const retWho = $('#ret-who');
+  const retWhoSuggest = $('#ret-who-suggest');
+  retWho.oninput = debounce(async () => {
+    const q = retWho.value.trim();
+    if (q.length < 2) { retWhoSuggest.innerHTML = ''; return; }
+    const users = (await api.get('/users' + qs({ q, limit: 12 }))).filter((u) => u.role !== 'catalogueur');
+    retWhoSuggest.innerHTML = users.length ? `<div class="suggest">${users.map((u) => `<button type="button" data-id="${u.id}" ${u.active_loans ? '' : 'disabled'}>
+      <span class="avatar-sm">${esc(u.avatar)}</span><span class="grow">${esc(u.first_name)} ${esc(u.last_name)}</span>
+      <span class="small">${u.active_loans ? `<span class="badge ${u.overdue_loans ? 'badge-late' : ''}">${u.active_loans} 📖</span>` : '<span class="muted">aucun livre</span>'}</span></button>`).join('')}</div>`
+      : '<p class="muted small">Personne trouvé.</p>';
+    for (const b of $$('button[data-id]', retWhoSuggest)) b.onclick = () => selectReturner({ kind: 'user', id: Number(b.dataset.id) });
+  }, 200);
+  retWho.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('button[data-id]:not([disabled])', retWhoSuggest)?.click(); } };
+  for (const b of $$('.ret-class-pick')) {
+    b.onclick = () => showReturnKids(classes.find((c) => c.id === Number(b.dataset.id)));
+  }
+
   drawLog();
   if (borrower?.kind === 'user') selectUser(borrower.id);
   else if (borrower?.kind === 'class') selectClass(borrower);
   else who.focus();
+  if (returner) selectReturner(returner);
+}
+
+/* ---------- Retour : l'enfant (ou la classe), puis ses livres ---------- */
+
+// Qui rend : { kind: 'user', id } ou { kind: 'class', id, name } ; classe dont on a affiché les avatars.
+let returner = null;
+let retPickedClass = null;
+
+/** Avatars d'une classe : seuls les enfants qui ont un livre sont actifs. */
+async function showReturnKids(cls) {
+  retPickedClass = cls;
+  const box = $('#ret-who-suggest');
+  if (!box) return;
+  const [users, fresh] = await Promise.all([api.get('/users' + qs({ class_id: cls.id, role: 'eleve' })), api.get('/classes')]);
+  const c = fresh.find((x) => x.id === cls.id) ?? cls;
+  const withBooks = users.filter((u) => u.active_loans);
+  box.innerHTML = `<div class="kid-grid" style="grid-template-columns:repeat(auto-fill,minmax(110px,1fr));margin-top:.6rem">
+      ${c.class_loans ? `<button type="button" class="kid-btn ret-class-loan" style="font-size:.95rem;padding:.6rem .3rem;border-style:dashed">
+        <span class="avatar" style="font-size:2rem">📦</span>Toute la classe<span class="badge">${c.class_loans} 📖</span></button>` : ''}
+      ${users.map((u) => `<button type="button" class="kid-btn" data-id="${u.id}" ${u.active_loans ? '' : 'disabled'} style="font-size:.95rem;padding:.6rem .3rem">
+        <span class="avatar" style="font-size:2rem">${esc(u.avatar)}</span>${esc(u.first_name)} ${esc(u.last_name[0] ?? '')}.
+        ${u.active_loans ? `<span class="badge ${u.overdue_loans ? 'badge-late' : ''}">${u.active_loans} 📖</span>` : ''}</button>`).join('')}</div>
+    ${!withBooks.length && !c.class_loans ? '<p class="muted small">Aucun livre à rendre dans cette classe.</p>' : ''}`;
+  for (const k of $$('.kid-btn[data-id]', box)) k.onclick = () => selectReturner({ kind: 'user', id: Number(k.dataset.id) });
+  const cl = $('.ret-class-loan', box);
+  if (cl) cl.onclick = () => selectReturner({ kind: 'class', id: c.id, name: c.name });
+}
+
+/** Les livres de l'enfant (ou de la classe), en grands boutons : un clic = rendu. */
+async function selectReturner(who) {
+  const box = $('#returner');
+  if (!box) return;
+  let info;
+  if (who.kind === 'class') {
+    const loans = await api.get('/loans' + qs({ loan_class_id: who.id }));
+    info = { ...who, avatar: '📦', title: `Classe ${who.name}`, first_name: 'la classe', loans };
+  } else {
+    const u = await api.get(`/users/${who.id}`);
+    info = { ...who, avatar: u.avatar, title: `${u.first_name} ${u.last_name}`, first_name: u.first_name, loans: u.loans };
+  }
+  returner = info;
+  $('#ret-who').value = '';
+  $('#ret-who-suggest').innerHTML = '';
+  const late = info.loans.filter((l) => l.overdue).length;
+  box.innerHTML = `<div class="borrower">
+      <span class="avatar-lg">${esc(info.avatar)}</span>
+      <div class="grow"><b>${esc(info.title)}</b><br><span class="muted small">${plural(info.loans.length, 'livre à rendre', 'livres à rendre')}</span>
+        ${late ? `<br><span class="badge badge-late">⚠️ ${plural(late, 'retard')}</span>` : ''}</div>
+      <button class="icon-btn" id="clear-returner" title="Changer">✕</button></div>
+    <p class="small" style="margin:.6rem 0 .3rem"><b>2. Quel livre ?</b> <span class="muted">— touchez le livre rendu</span></p>
+    ${info.loans.length ? `<div class="suggest return-books">${info.loans.map((l) => `<button type="button" data-loan="${l.id}">
+        ${cover(l, 'cover-sm')}<span class="grow"><b>${esc(l.title)}</b><br><span class="muted small">n° ${esc(l.barcode ?? '')}
+        — ${l.overdue ? `<span class="badge badge-late">en retard de ${plural(l.days_late, 'jour')}</span>` : `à rendre le ${fmtDate(l.due_at)}`}</span></span>
+        <span class="btn btn-sm btn-primary">📥 Rendre</span></button>`).join('')}</div>
+      ${info.loans.length > 1 ? `<div class="actions" style="margin-top:.4rem"><button class="btn btn-sm" id="return-all">📥 Tout rendre (${info.loans.length})</button></div>` : ''}`
+    : '<p class="muted">Aucun livre à rendre. 👍</p>'}`;
+  $('#clear-returner').onclick = () => nextReturner(true);
+  for (const b of $$('button[data-loan]', box)) b.onclick = () => returnAndConfirm({ loan_id: Number(b.dataset.loan) });
+  const all = $('#return-all', box);
+  if (all) all.onclick = async () => {
+    if (!(await confirmBox(`Rendre les ${info.loans.length} livres de ${info.title} ?`, { ok: 'Tout rendre' }))) return;
+    const results = [];
+    for (const l of info.loans) {
+      const r = await doReturn({ loan_id: l.id });
+      if (r) results.push(r);
+    }
+    if (results.length) confirmReturn(results[results.length - 1], 0, results);
+  };
+}
+
+/** Remet la colonne « Rendre » à zéro et réaffiche les avatars de la classe. */
+function nextReturner(focusOnly = false) {
+  returner = null;
+  const box = $('#returner');
+  if (!box) return;
+  box.innerHTML = '';
+  if (retPickedClass && !focusOnly) return showReturnKids(retPickedClass);
+  $('#ret-who').focus();
+}
+
+/** Rend un livre (journal, livre réservé à mettre de côté). Résultat, ou null en cas d'erreur. */
+async function doReturn(target) {
+  try {
+    const r = await api.post('/loans/return', target);
+    addLog(r.days_late ? 'warn' : 'ok', `📥 « ${r.title} » (n° ${r.barcode ?? '?'}) rendu par ${r.first_name ? `${r.first_name} ${r.last_name}` : 'la classe'}${r.days_late ? ` — ${plural(r.days_late, 'jour')} de retard` : ''}`);
+    if (r.reserved_for) addLog('warn', `🔖 Mettez « ${r.title} » de côté : il est réservé pour ${r.reserved_for}`);
+    return r;
+  } catch (err) {
+    addLog('err', err.message);
+    toast(err.message, 'error');
+    return null;
+  }
+}
+
+async function returnAndConfirm(target) {
+  const r = await doReturn(target);
+  if (!r) return;
+  const left = returner ? returner.loans.filter((l) => l.id !== r.id).length : 0;
+  confirmReturn(r, left);
+  if (borrower) refreshBorrower();
+}
+
+/**
+ * Fenêtre de confirmation du retour. « Élève suivant » (ou Entrée, ou 5 secondes) remet la colonne à zéro ;
+ * un livre réservé par quelqu'un d'autre garde la fenêtre ouverte : il faut le mettre de côté.
+ */
+function confirmReturn(r, left, all = null) {
+  const who = r.first_name ? `${r.first_name} ${r.last_name}` : 'la classe';
+  const reserved = (all ?? [r]).filter((x) => x.reserved_for);
+  const dlg = modal(all && all.length > 1 ? `📥 ${all.length} livres rendus` : '📥 Livre rendu', `<div class="loan-ok">
+      ${cover(r, 'cover-md')}
+      <div><p class="loan-ok-title">${all && all.length > 1 ? all.map((x) => esc(x.title)).join('<br>') : esc(r.title)}</p>
+        ${all && all.length > 1 ? '' : `<p class="muted">n° ${esc(r.barcode ?? '')}</p>`}
+        <p class="loan-ok-who"><span class="avatar-lg">${esc(r.avatar ?? '📦')}</span><b>${esc(who)}</b></p>
+        ${r.days_late ? `<p><span class="badge badge-late">Rendu avec ${plural(r.days_late, 'jour')} de retard</span></p>` : '<p>Merci ! 👍</p>'}
+        ${reserved.map((x) => `<p class="reserved-alert">🔖 Mettez « ${esc(x.title)} » de côté : réservé pour <b>${esc(x.reserved_for)}</b></p>`).join('')}</div></div>
+    <div class="actions">
+      ${left ? `<button class="btn" data-same>📥 Un autre livre ${r.first_name ? `de ${esc(r.first_name)}` : 'de la classe'} (${left})</button>` : ''}
+      <button class="btn btn-primary" data-next autofocus>👍 Élève suivant</button></div>
+    ${reserved.length ? '' : '<p class="small muted" data-countdown style="text-align:right;margin:.4rem 0 0">Se ferme tout seul dans <span data-count>5</span> s</p>'}`);
+  let choice = 'next';
+  let timer = null;
+  if (!reserved.length) {
+    let n = 5;
+    timer = setInterval(() => {
+      n--;
+      const c = dlg.querySelector('[data-count]');
+      if (c) c.textContent = n;
+      if (n <= 0) dlg.close();
+    }, 1000);
+    dlg.addEventListener('pointerdown', () => { clearInterval(timer); dlg.querySelector('[data-countdown]')?.remove(); }, { once: true });
+  }
+  dlg.querySelector('[data-same]')?.addEventListener('click', () => { choice = 'same'; dlg.close(); });
+  dlg.querySelector('[data-next]').onclick = () => dlg.close();
+  dlg.addEventListener('close', () => {
+    clearInterval(timer);
+    if (!$('#returner')) return; // page quittée
+    if (choice === 'same' && returner) selectReturner(returner);
+    else nextReturner();
+  });
 }
 
 let nextBorrower = () => {};
@@ -223,21 +388,16 @@ async function lend(target, ignore_reservation = false) {
   $('#loan-code').focus();
 }
 
+/** Retour depuis la saisie directe (numéro, titre) ou depuis la fiche de l'emprunteur côté prêt. */
 async function giveBack(target) {
-  try {
-    const r = await api.post('/loans/return', target);
-    addLog(r.days_late ? 'warn' : 'ok', `📥 « ${r.title} » (n° ${r.barcode ?? '?'}) rendu par ${r.first_name} ${r.last_name}${r.days_late ? ` — ${plural(r.days_late, 'jour')} de retard` : ''}`);
-    if (r.reserved_for) {
-      addLog('warn', `🔖 Mettez « ${r.title} » de côté : il est réservé pour ${r.reserved_for}`);
-      toast(`Réservé ! Mettez ce livre de côté pour ${r.reserved_for}`);
-    }
-    $('#return-code').value = '';
-    $('#return-suggest').innerHTML = '';
-    if (borrower) await refreshBorrower();
-  } catch (err) {
-    addLog('err', err.message);
-    toast(err.message, 'error');
-  }
+  const r = await doReturn(target);
+  if (!r) { $('#return-code')?.focus(); return; }
+  $('#return-code').value = '';
+  $('#return-suggest').innerHTML = '';
+  if (borrower) await refreshBorrower();
+  if (returner) await selectReturner(returner);
+  if (r.reserved_for) toast(`Réservé ! Mettez ce livre de côté pour ${r.reserved_for}`);
+  else toast(`📥 « ${r.title} » rendu`);
   $('#return-code').focus();
 }
 

@@ -1,7 +1,7 @@
 /** Thèmes créés par l'administrateur (« Les animaux », « Noël »…) pour classer et filtrer les livres. */
 import { HttpError } from '../util.js';
 import { getSettings, tx } from '../db.js';
-import { staff, admin, anyUser } from '../guards.js';
+import { staff, admin, anyUser, catalog } from '../guards.js';
 
 function cleanTheme(body, existing = {}) {
   const t = { ...existing };
@@ -52,7 +52,7 @@ export default function (r) {
   });
 
   // Ajouter (ou retirer) des documents d'un thème, par lot.
-  r.post('/api/themes/:id/documents', staff, ({ db, params, body }) => tx(db, () => {
+  r.post('/api/themes/:id/documents', catalog, ({ db, params, body }) => tx(db, () => {
     if (!db.prepare('SELECT 1 FROM themes WHERE id = ?').get(params.id)) throw new HttpError(404, 'Thème introuvable');
     const ids = (body.document_ids ?? []).map(Number);
     const stmt = body.remove

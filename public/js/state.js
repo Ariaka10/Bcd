@@ -9,6 +9,8 @@ export function navigate(hash) {
   else location.hash = hash;
 }
 
+/** Compte « Ajout de livres » : pas d'accès aux élèves, aux prêts ni aux listes. */
+export const isCataloguer = () => state.user?.role === 'catalogueur';
 export const isAdmin = () => state.user?.role === 'admin';
 export const typeLabel = (t) => state.meta?.doc_types?.[t]?.label ?? t ?? '';
 

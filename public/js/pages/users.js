@@ -2,7 +2,7 @@ import { api, qs } from '../api.js';
 import { esc, toast, modal, confirmBox, formData, fmtDate, plural, readTextFile, $, $$ } from '../ui.js';
 import { state, navigate, isAdmin } from '../state.js';
 
-const ROLES = { eleve: 'Élève', enseignant: 'Enseignant', admin: 'Administrateur' };
+const ROLES = { eleve: 'Élève', enseignant: 'Enseignant', catalogueur: 'Ajout de livres (bénévole, stagiaire…)', admin: 'Administrateur' };
 let avatarsCache;
 const avatars = async () => (avatarsCache ??= await api.get('/meta/avatars'));
 
@@ -151,7 +151,7 @@ async function editUser(u, classes, defaults = {}) {
     const kid = form.role.value === 'eleve';
     for (const el of $$('.kid-only', dlg)) el.style.display = kid ? '' : 'none';
     for (const el of $$('.adult-only', dlg)) el.style.display = kid ? 'none' : '';
-    const teacher = form.role.value === 'enseignant';
+    const teacher = ['enseignant', 'catalogueur'].includes(form.role.value);
     for (const el of $$('.teacher-only', dlg)) el.style.display = teacher && !isNew ? '' : 'none';
     $('#pwd-hint', dlg).textContent = form.role.value === 'admin' ? (isNew ? '— obligatoire' : '')
       : '— facultatif : sans mot de passe, la carte s\'ouvre d\'un clic';

@@ -5,6 +5,7 @@ import { HttpError, localDate, randomToken } from '../util.js';
 import { getSettings, DEFAULT_SETTINGS, ensureDefaults, currentSchoolYear } from '../db.js';
 import { staff, admin, anyUser } from '../guards.js';
 import { fixMojibake, hasMojibake } from '../text.js';
+import { detailedStats } from '../stats.js';
 import { snapshot, backupFileName, autoBackup, listBackups, restoreFrom, resolveExtraDir, copyToExtraDir } from '../backup.js';
 
 function tempFile() {
@@ -232,6 +233,9 @@ export default function (r, { backupDir, appInfo, installUpdate, checkUpdate, ch
     }
     return getSettings(db);
   });
+
+  // Statistiques détaillées d'une année scolaire (accueil → « Statistiques »).
+  r.get('/api/stats/details', staff, ({ db, query }) => detailedStats(db, query.year));
 
   r.get('/api/stats', staff, ({ db }) => {
     const today = localDate();

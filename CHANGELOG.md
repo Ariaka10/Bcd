@@ -2,9 +2,23 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
-## [Non publié]
+## [1.6.0] — 2026-11-12
+
+### Ajouté
+- **Statistiques détaillées** sur l'accueil (menu « 📊 Statistiques détaillées », qui reste ouvert si on le souhaite) :
+  prêts par mois (graphique et tableau), élèves lecteurs, prêts par élève, part du fonds empruntée, livres jamais empruntés,
+  livres ajoutés, retours en retard et pertes, tableau par classe, 10 livres les plus empruntés, thèmes préférés,
+  prêts par type ; choix de l'année scolaire et **bilan imprimable** (pour le conseil d'école). Aucun nom d'élève.
+- **Compte « Ajout de livres »** pour un bénévole, un service civique ou un stagiaire : ajouter et modifier des livres,
+  couvertures, thèmes, étiquettes, tous les livres. **Aucun accès aux élèves, aux prêts, aux listes ni aux réglages** ;
+  la fiche d'un livre ne montre pas qui l'a emprunté. Ne peut pas emprunter ni supprimer. Créé par l'administrateur
+  (*Usagers → Nouveau*, profil « Ajout de livres »), carte de connexion d'un clic, mot de passe facultatif.
 
 ### Modifié
+- **Retour sur le modèle du prêt** : « 1. Qui rend ? » (nom, ou classe puis avatar ; les enfants sans livre sont grisés),
+  puis « 2. Quel livre ? » avec les livres de l'enfant en grands boutons, « Tout rendre », et une fenêtre de confirmation
+  (« Un autre livre de… » / « Élève suivant », fermeture toute seule après 5 secondes). Un livre réservé par quelqu'un
+  d'autre garde la fenêtre ouverte pour penser à le mettre de côté. La saisie directe par numéro ou titre reste possible.
 - **Licence** : BCD est désormais distribué sous la **Licence publique de l'Union européenne (EUPL) v1.2**
   (fichier `LICENSE`, version officielle française disponible sur EUR-Lex).
 

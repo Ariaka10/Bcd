@@ -10,5 +10,7 @@ export function requireRole(...roles) {
   };
 }
 export const staff = requireRole('admin', 'enseignant');
+/** Ajout et modification des livres : adultes, et compte « Ajout de livres » (bénévole, stagiaire…). */
+export const catalog = requireRole('admin', 'enseignant', 'catalogueur');
 export const admin = requireRole('admin');
 export const anyUser = requireRole();

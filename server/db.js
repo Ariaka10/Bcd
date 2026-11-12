@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS classes (
 
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY,
-  role TEXT NOT NULL CHECK (role IN ('admin', 'enseignant', 'eleve')),
+  -- catalogueur : compte « Ajout de livres » (bénévole, service civique, stagiaire), sans accès aux élèves
+  role TEXT NOT NULL CHECK (role IN ('admin', 'enseignant', 'eleve', 'catalogueur')),
   username TEXT UNIQUE,
   password_hash TEXT,
   first_name TEXT NOT NULL,
@@ -270,6 +271,30 @@ function migrateSchema(db) {
   }
   if (tables.has('documents') && !columns(db, 'documents').includes('keywords')) {
     db.exec('ALTER TABLE documents ADD COLUMN keywords TEXT');
+  }
+  // v1.6 : nouveau profil « catalogueur » → la contrainte sur le rôle change (reconstruction de la table).
+  const usersSql = tables.has('users') ? db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'`).get().sql : '';
+  if (usersSql && !usersSql.includes("'catalogueur'")) {
+    const newSql = usersSql
+      .replace("CHECK (role IN ('admin', 'enseignant', 'eleve'))", "CHECK (role IN ('admin', 'enseignant', 'eleve', 'catalogueur'))")
+      .replace(/CREATE TABLE "?users"?/, 'CREATE TABLE users_v16');
+    if (newSql.includes("'catalogueur'")) {
+      const cols = columns(db, 'users').map((c) => `"${c}"`).join(', ');
+      db.exec('PRAGMA foreign_keys = OFF');
+      db.exec('BEGIN');
+      try {
+        db.exec(`${newSql};
+          INSERT INTO users_v16 (${cols}) SELECT ${cols} FROM users;
+          DROP TABLE users;
+          ALTER TABLE users_v16 RENAME TO users;`);
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      } finally {
+        db.exec('PRAGMA foreign_keys = ON');
+      }
+    }
   }
   // v1.1 : prêts aux classes → la colonne user_id devient facultative (reconstruction de la table).
   if (tables.has('loans') && !columns(db, 'loans').includes('class_id')) {

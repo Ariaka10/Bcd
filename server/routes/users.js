@@ -4,7 +4,7 @@ import { staff, admin } from '../guards.js';
 import { parseStudentList } from '../csv.js';
 import { listLoans, listReservations } from './loans.js';
 
-const ROLES = ['admin', 'enseignant', 'eleve'];
+const ROLES = ['admin', 'enseignant', 'eleve', 'catalogueur'];
 
 function splitCode(code) {
   // Les pictogrammes peuvent compter plusieurs « caractères » JS : on les découpe d'après la liste connue.
@@ -180,7 +180,7 @@ export default function (r) {
     if (user.role !== 'admin' && u.role !== 'eleve') throw new HttpError(403, 'Seul un administrateur peut créer un compte adulte');
     // Mot de passe obligatoire pour un administrateur, facultatif pour un·e enseignant·e.
     if (u.role === 'admin' && String(body.password ?? '').length < 6) throw new HttpError(400, 'Mot de passe : 6 caractères minimum');
-    if (u.role === 'enseignant' && body.password && String(body.password).length < 6) throw new HttpError(400, 'Mot de passe : 6 caractères minimum');
+    if (['enseignant', 'catalogueur'].includes(u.role) && body.password && String(body.password).length < 6) throw new HttpError(400, 'Mot de passe : 6 caractères minimum');
     let base = u.username;
     for (let i = 2; u.username && db.prepare('SELECT 1 FROM users WHERE username = ?').get(u.username); i++) u.username = `${base}${i}`;
     const cols = [...USER_COLS, 'password_hash'];
@@ -206,7 +206,7 @@ export default function (r) {
       if (String(body.password).length < 6) throw new HttpError(400, 'Mot de passe : 6 caractères minimum');
       db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(body.password), existing.id);
     }
-    if (body.remove_password && u.role === 'enseignant') {
+    if (body.remove_password && ['enseignant', 'catalogueur'].includes(u.role)) {
       db.prepare('UPDATE users SET password_hash = NULL WHERE id = ?').run(existing.id);
     }
     if (u.role === 'admin' && !db.prepare('SELECT password_hash FROM users WHERE id = ?').get(existing.id).password_hash) {

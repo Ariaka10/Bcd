@@ -1,6 +1,6 @@
 import { HttpError, normalize } from '../util.js';
 import { tx } from '../db.js';
-import { staff, admin, anyUser } from '../guards.js';
+import { staff, admin, anyUser, catalog } from '../guards.js';
 import { computeCote, DOC_TYPES } from '../cote.js';
 import { toIsbn13, cleanIsbn } from '../isbn.js';
 import { lookupIsbn as defaultLookup } from '../notice.js';
@@ -189,7 +189,8 @@ export function getDocument(db, id, user) {
       cv.origin AS cover_origin, cv.updated_at AS cover_date
     FROM documents d LEFT JOIN covers cv ON cv.document_id = d.id WHERE d.id = ?`).get(id);
   if (!d) throw new HttpError(404, 'Document introuvable');
-  const isStaff = user && user.role !== 'eleve';
+  // Emprunteurs et réservations : réservés aux enseignant·es et à l'administrateur.
+  const isStaff = user && ['admin', 'enseignant'].includes(user.role);
   d.copies = db.prepare(`
     SELECT c.id, c.barcode, c.state, c.acquired_at, c.notes, c.issue_label, c.issue_date,
       l.id AS loan_id, l.due_at, l.loaned_at, l.user_id, l.class_id AS loan_class_id,
@@ -258,7 +259,7 @@ export default function (r, deps) {
     res.end(Buffer.from(c.data));
   });
 
-  r.put('/api/documents/:id/cover', staff, ({ db, params, raw }) => {
+  r.put('/api/documents/:id/cover', catalog, ({ db, params, raw }) => {
     if (!db.prepare('SELECT 1 FROM documents WHERE id = ?').get(params.id)) throw new HttpError(404, 'Document introuvable');
     if (!raw?.length) throw new HttpError(400, 'Image manquante');
     if (raw.length > 3 * 1024 * 1024) throw new HttpError(413, 'Image trop lourde (3 Mo maximum)');
@@ -269,7 +270,7 @@ export default function (r, deps) {
     return { ok: true, cover_url: db.prepare('SELECT cover_url FROM documents WHERE id = ?').get(id).cover_url };
   });
 
-  r.delete('/api/documents/:id/cover', staff, ({ db, params }) => {
+  r.delete('/api/documents/:id/cover', catalog, ({ db, params }) => {
     tx(db, () => {
       db.prepare('DELETE FROM covers WHERE document_id = ?').run(params.id);
       // Couverture retirée volontairement : la recherche automatique ne la remet pas.
@@ -324,7 +325,7 @@ export default function (r, deps) {
     return { ok: true };
   });
 
-  r.get('/api/documents/export.csv', staff, ({ db, query, res }) => {
+  r.get('/api/documents/export.csv', catalog, ({ db, query, res }) => {
     const { items } = searchDocuments(db, { ...query, limit: 5000 });
     const themes = new Map(db.prepare('SELECT id, name FROM themes').all().map((t) => [String(t.id), t.name]));
     const rows = [['N° exemplaires', 'Cote', 'Titre', 'Auteurs', 'Éditeur', 'Année', 'Collection', 'Type', 'Thèmes', 'Mots-clés',
@@ -345,7 +346,7 @@ export default function (r, deps) {
     return getDocument(db, Number(params.id), user);
   });
 
-  r.post('/api/documents', staff, ({ db, body }) => tx(db, () => {
+  r.post('/api/documents', catalog, ({ db, body }) => tx(db, () => {
     const d = sanitizeDoc(body);
     const cols = DOC_FIELDS;
     const { lastInsertRowid } = db.prepare(`INSERT INTO documents (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`)
@@ -358,7 +359,7 @@ export default function (r, deps) {
     return { id, cote: d.cote, barcodes };
   }));
 
-  r.put('/api/documents/:id', staff, ({ db, params, body }) => {
+  r.put('/api/documents/:id', catalog, ({ db, params, body }) => {
     const existing = db.prepare('SELECT * FROM documents WHERE id = ?').get(params.id);
     if (!existing) throw new HttpError(404, 'Document introuvable');
     const d = sanitizeDoc(body, existing);
@@ -399,9 +400,9 @@ export default function (r, deps) {
     return { updated: n };
   }));
 
-  r.post('/api/cote', staff, ({ body }) => ({ cote: computeCote(body) }));
+  r.post('/api/cote', catalog, ({ body }) => ({ cote: computeCote(body) }));
 
-  r.get('/api/isbn/:isbn', staff, async ({ db, params }) => {
+  r.get('/api/isbn/:isbn', catalog, async ({ db, params }) => {
     const isbn = toIsbn13(params.isbn);
     const local = isbn ? db.prepare('SELECT id, title, cote FROM documents WHERE isbn = ?').get(isbn) : null;
     const result = await lookup(params.isbn);
@@ -413,7 +414,7 @@ export default function (r, deps) {
   });
 
   // Exemplaires
-  r.post('/api/documents/:id/copies', staff, ({ db, params, body }) => tx(db, () => {
+  r.post('/api/documents/:id/copies', catalog, ({ db, params, body }) => tx(db, () => {
     if (!db.prepare('SELECT 1 FROM documents WHERE id = ?').get(params.id)) throw new HttpError(404, 'Document introuvable');
     const issue = { issue_label: String(body.issue_label ?? '').trim() || null, issue_date: /^\d{4}-\d{2}(-\d{2})?$/.test(body.issue_date ?? '') ? body.issue_date : null };
     return { barcodes: addCopies(db, Number(params.id), { count: body.count ?? (body.barcode ? 0 : 1), barcodes: body.barcode ? [body.barcode] : [], ...issue }) };
@@ -432,7 +433,7 @@ export default function (r, deps) {
     return { copy_id: c.id, document: getDocument(db, c.document_id, { role: 'admin' }) };
   });
 
-  r.put('/api/copies/:id', staff, ({ db, params, body }) => {
+  r.put('/api/copies/:id', catalog, ({ db, params, body }) => {
     const c = db.prepare('SELECT * FROM copies WHERE id = ?').get(params.id);
     if (!c) throw new HttpError(404, 'Exemplaire introuvable');
     const state = body.state ?? c.state;

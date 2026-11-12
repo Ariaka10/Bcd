@@ -35,19 +35,24 @@ const NAV = {
     ['#/prets', '📚', 'Prêts'], ['#/usagers', '👧', 'Ma classe'], ['#/listes', '📋', 'Listes'],
   ],
   eleve: [['#/', '🔎', 'Chercher un livre'], ['#/mes-prets', '📚', 'Mes livres']],
+  // Compte « Ajout de livres » (bénévole, service civique, stagiaire) : catalogue seulement
+  catalogueur: [
+    ['#/', '🏠', 'Accueil'], ['#/document/nouveau', '➕', 'Ajouter'], ['#/inventaire', '📚', 'Tous les livres'],
+    ['#/catalogue', '🔎', 'Catalogue'],
+  ],
 };
 
 // [motif, module, rôles autorisés]
 const ROUTES = [
   [/^\/connexion$/, login, null],
-  [/^\/$/, null, ['admin', 'enseignant', 'eleve']],
-  [/^\/catalogue$/, catalogue, ['admin', 'enseignant']],
-  [/^\/inventaire$/, catalogue, ['admin', 'enseignant']],
+  [/^\/$/, null, ['admin', 'enseignant', 'eleve', 'catalogueur']],
+  [/^\/catalogue$/, catalogue, ['admin', 'enseignant', 'catalogueur']],
+  [/^\/inventaire$/, catalogue, ['admin', 'enseignant', 'catalogueur']],
   [/^\/themes$/, catalogue, ['admin', 'enseignant']],
   [/^\/import-livres$/, catalogue, ['admin']],
-  [/^\/document\/nouveau$/, documentPage, ['admin', 'enseignant']],
-  [/^\/document\/(\d+)$/, documentPage, ['admin', 'enseignant', 'eleve']],
-  [/^\/document\/(\d+)\/modifier$/, documentPage, ['admin', 'enseignant']],
+  [/^\/document\/nouveau$/, documentPage, ['admin', 'enseignant', 'catalogueur']],
+  [/^\/document\/(\d+)$/, documentPage, ['admin', 'enseignant', 'eleve', 'catalogueur']],
+  [/^\/document\/(\d+)\/modifier$/, documentPage, ['admin', 'enseignant', 'catalogueur']],
   [/^\/prets$/, circulation, ['admin', 'enseignant']],
   [/^\/retards$/, circulation, ['admin', 'enseignant']],
   [/^\/usagers$/, users, ['admin', 'enseignant']],
@@ -57,12 +62,12 @@ const ROUTES = [
   [/^\/cartes$/, users, ['admin', 'enseignant']],
   [/^\/listes$/, lists, ['admin', 'enseignant']],
   [/^\/liste\/(\d+)$/, lists, ['admin', 'enseignant']],
-  [/^\/etiquettes$/, lists, ['admin', 'enseignant']],
+  [/^\/etiquettes$/, lists, ['admin', 'enseignant', 'catalogueur']],
   [/^\/desherbage$/, weeding, ['admin']],
   [/^\/parametres$/, settings, ['admin']],
   [/^\/rentree$/, rentree, ['admin']],
   [/^\/classe\/(\d+)$/, users, ['admin', 'enseignant']],
-  [/^\/mon-compte$/, settings, ['admin', 'enseignant', 'eleve']],
+  [/^\/mon-compte$/, settings, ['admin', 'enseignant', 'eleve', 'catalogueur']],
   [/^\/mes-prets$/, eleve, ['eleve']],
 ];
 

@@ -1,7 +1,7 @@
 /** Catalogue : recherche, « Tous les livres » (inventaire complet) et gestion des thèmes. */
 import { api, qs } from '../api.js';
 import { esc, cover, toast, modal, confirmBox, formData, plural, readTextFile, debounce, $, $$ } from '../ui.js';
-import { state, navigate, isAdmin, typeLabel, loadThemes, themeChips } from '../state.js';
+import { state, navigate, isAdmin, isCataloguer, typeLabel, loadThemes, themeChips } from '../state.js';
 
 const selected = new Set();
 const ADV_FIELDS = ['title', 'author', 'subject', 'keyword', 'theme_id', 'series', 'publisher', 'isbn', 'cote', 'doc_type',
@@ -20,7 +20,7 @@ export function tabs(active) {
   return `<div class="tabs no-print">
     <a href="#/catalogue" class="${active === 'search' ? 'active' : ''}">🔎 Recherche</a>
     <a href="#/inventaire" class="${active === 'all' ? 'active' : ''}">📚 Tous les livres</a>
-    <a href="#/themes" class="${active === 'themes' ? 'active' : ''}">🏷️ Thèmes</a>
+    ${isCataloguer() ? '' : `<a href="#/themes" class="${active === 'themes' ? 'active' : ''}">🏷️ Thèmes</a>`}
     ${isAdmin() ? `<a href="#/desherbage" class="${active === 'weeding' ? 'active' : ''}">🌿 Désherbage</a>
       <a href="#/import-livres" class="${active === 'import' ? 'active' : ''}">📥 Importer</a>` : ''}</div>`;
 }
@@ -40,7 +40,7 @@ async function renderSearch(app, query) {
   app.innerHTML = `
     <div class="page-head"><div><h1>Catalogue</h1><p class="muted">${plural(res.total, 'document')}</p></div>
       <div class="row no-print">
-        <button class="btn" id="list-from-search">📋 Créer une liste avec ces résultats</button>
+        ${isCataloguer() ? '' : '<button class="btn" id="list-from-search">📋 Créer une liste avec ces résultats</button>'}
         <a class="btn btn-primary" href="#/document/nouveau">➕ Ajouter un document</a></div></div>
     ${tabs('search')}
     ${state.themes.length ? `<div class="theme-bar no-print">${state.themes.map((t) => `<a class="chip chip-lg ${String(q.theme_id) === String(t.id) ? 'active' : ''}"
@@ -102,7 +102,7 @@ async function renderSearch(app, query) {
   $('#reset').onclick = () => go({ q: $('#search').q.value });
   for (const b of $$('[data-page]')) b.onclick = () => go({ ...q, page: b.dataset.page });
   bindSelection(q, res.total);
-  $('#list-from-search').onclick = () => newListDialog({ from_search: { ...q, page: undefined, sort: undefined } }, res.total);
+  if ($('#list-from-search')) $('#list-from-search').onclick = () => newListDialog({ from_search: { ...q, page: undefined, sort: undefined } }, res.total);
 }
 
 /* ---------- Tous les livres (inventaire) ---------- */
@@ -197,7 +197,7 @@ function renderSelectionBar(q, total) {
     <button class="btn btn-sm" id="sel-none">Désélectionner</button>
     <span class="grow"></span>
     <button class="btn btn-sm" id="sel-theme">🏷️ Ranger dans un thème</button>
-    <button class="btn btn-sm" id="sel-list">📋 Ajouter à une liste</button>
+    ${isCataloguer() ? '' : '<button class="btn btn-sm" id="sel-list">📋 Ajouter à une liste</button>'}
     <button class="btn btn-sm" id="sel-labels">🔖 Étiquettes</button>
     ${isAdmin() ? `<button class="btn btn-sm" id="sel-cote">🔁 Recalculer les cotes</button>
     <button class="btn btn-sm btn-danger" id="sel-delete">🗑️ Supprimer</button>` : ''}</div>`;
@@ -211,7 +211,7 @@ function renderSelectionBar(q, total) {
     renderSelectionBar(q, total);
   };
   $('#sel-theme').onclick = () => themeDialog([...selected]);
-  $('#sel-list').onclick = () => addToListDialog([...selected]);
+  if ($('#sel-list')) $('#sel-list').onclick = () => addToListDialog([...selected]);
   $('#sel-labels').onclick = () => { state.labelIds = [...selected]; navigate('#/etiquettes'); };
   if (isAdmin()) {
     $('#sel-cote').onclick = async () => {

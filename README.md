@@ -74,8 +74,9 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
 - **Désherbage** par lots, **listes thématiques** et **étiquettes** à imprimer, export Excel (CSV).
 
 ### Prêts
-- Comptoir **avec ou sans douchette** : numéro, titre ou ISBN du livre ; retour par numéro, titre ou nom de l'enfant.
-  Chaque prêt est confirmé dans une fenêtre, puis le comptoir est prêt pour l'élève suivant.
+- Comptoir **avec ou sans douchette** : l'enfant (classe puis avatar), puis le livre (numéro, titre ou ISBN) ;
+  le **retour fonctionne de la même façon** (l'enfant, puis ses livres en grands boutons). Chaque opération est confirmée
+  dans une fenêtre, puis le comptoir est prêt pour l'élève suivant.
 - **Prêt à toute une classe** (lot de livres), **réservations** (par un adulte ou « Je le veux ! » de l'élève),
   livre mis de côté au retour.
 - **Retards** par classe et **mots aux familles** imprimables (prénom de l'enfant, signés par l'enseignant·e, à découper) ; **fin d'année** : listes par classe et date de retour commune.
@@ -91,7 +92,10 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
   **cartes de connexion** imprimables.
 - Espace élève pensé pour la maternelle : thèmes en gros boutons, couvertures, « Mes livres »,
   **avis en frimousses** et rayon « Coups de cœur ».
-- Profils **administrateur**, **enseignant**, **élève**. Les adultes aussi se connectent par **cartes** :
+- **Statistiques détaillées** sur l'accueil : prêts par mois, lecteurs, rotation du fonds, classes, livres et thèmes
+  préférés ; bilan annuel imprimable, sans nom d'élève.
+- Profils **administrateur**, **enseignant**, **élève**, et **« Ajout de livres »** pour un bénévole, un service civique
+  ou un stagiaire (catalogue seulement, aucun accès aux élèves ni aux prêts). Les adultes aussi se connectent par **cartes** :
   un clic pour les enseignant·es (mot de passe facultatif, proposé à la première connexion), mot de passe pour l'administrateur.
 
 ### Sécurité des données

@@ -1,6 +1,7 @@
 import { api } from '../api.js';
 import { esc, toast, formData, confirmBox, fmtDate, $, $$ } from '../ui.js';
 import { state, navigate } from '../state.js';
+import { runUpdate } from '../update.js';
 
 export async function render(app, { path }) {
   if (path === '/mon-compte') return renderAccount(app);
@@ -246,24 +247,14 @@ async function renderVersion() {
       : info.update_error ? `<p class="muted">Impossible de vérifier les mises à jour : ${esc(info.update_error)}</p>`
       : '<p class="muted">Vous avez la dernière version.</p>'}
     <div class="row">
-      ${u?.can_install ? '<button class="btn btn-primary" id="install">⬇️ Installer la mise à jour</button>' : ''}
+      ${u?.can_install ? `<button class="btn btn-primary" id="install">⬇️ Installer la mise à jour${u.download_size ? ` <span class="muted small">(${(u.download_size / 1024 / 1024).toFixed(u.download_size < 10485760 ? 1 : 0).replace('.', ',')} Mo)</span>` : ''}</button>` : ''}
       <a class="btn" href="${esc(u?.url ?? info.releases_url)}" target="_blank" rel="noopener">🌐 Page de téléchargement (GitHub)</a>
       <button class="btn" id="check">🔁 Vérifier maintenant</button></div>
-    <p class="small muted">L'application vérifie seule les nouvelles versions au démarrage. Si l'ordinateur bloque l'installation automatique,
-      téléchargez la nouvelle version depuis la page GitHub (installateur ou fichier zip).</p>`;
+    <p class="small muted">L'application vérifie seule les nouvelles versions au démarrage.
+      ${info.portable ? 'Version sans installation : seule la partie modifiée est téléchargée quand c\'est possible ; sinon, téléchargez le nouveau zip depuis la page GitHub.'
+        : 'Si l\'ordinateur bloque l\'installation automatique, téléchargez la nouvelle version depuis la page GitHub.'}</p>`;
   const install = $('#install', box);
-  if (install) install.onclick = async () => {
-    install.disabled = true;
-    install.textContent = 'Téléchargement…';
-    try {
-      await api.post('/app/install-update');
-      box.insertAdjacentHTML('beforeend', '<p class="badge badge-warn">⏳ Installation… l\'application va redémarrer.</p>');
-    } catch (e) {
-      toast(`${e.message} — utilisez la page de téléchargement`, 'error');
-      install.disabled = false;
-      install.textContent = 'Réessayer';
-    }
-  };
+  if (install) install.onclick = () => runUpdate(u);
   $('#check', box).onclick = async () => {
     await api.post('/app/check-update').catch(() => {});
     renderVersion();

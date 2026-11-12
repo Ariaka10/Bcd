@@ -2,6 +2,21 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
+## [1.7.0] — 2026-11-12
+
+### Ajouté
+- **Bouton « 🌓 Contraste »** en bas à gauche de l'écran (connexion comprise) : couleurs nettement plus marquées et
+  bordures épaisses, pour les écrans pâles ou vieillissants. Réglage gardé sur cet ordinateur.
+- **Mise à jour avec barre de progression** : pourcentage et Mo téléchargés, puis annonce claire
+  « l'application va se fermer puis se rouvrir toute seule ». Taille du téléchargement indiquée sur le bouton.
+- **Mise à jour légère de la version zip** : seule la partie « application » est téléchargée (quelques Mo au lieu du zip
+  complet), vérifiée, puis mise en place à la fermeture ; BCD se rouvre tout seul. L'ancienne version est gardée en secours.
+  Si le moteur de l'application change, le lien vers le zip complet est proposé comme avant.
+  *Disponible à partir de la mise à jour suivante (la 1.7.0 elle-même s'installe encore avec le zip complet).*
+
+### Modifié
+- **Espacement** entre les blocs qui se suivent (statistiques détaillées, grilles, cartes).
+
 ## [1.6.1] — 2026-11-12
 
 ### Corrigé

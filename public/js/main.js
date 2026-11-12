@@ -1,6 +1,7 @@
 import { api } from './api.js';
 import { $, esc, toast, printPreview } from './ui.js';
 import { initTables } from './tables.js';
+import { runUpdate } from './update.js';
 
 // Tous les boutons « Imprimer » (et Ctrl+P) ouvrent d'abord l'aperçu avant impression.
 window.bcdPrint = () => printPreview();
@@ -162,24 +163,14 @@ async function checkUpdate() {
   bar.id = 'update-banner';
   bar.className = 'update-banner no-print';
   bar.innerHTML = `🎉 Nouvelle version <b>${esc(u.version)}</b> disponible (vous avez la ${esc(info.version)}).
-    ${u.can_install ? '<button class="btn btn-sm btn-primary" id="upd-install">Installer et redémarrer</button>' : ''}
+    ${u.can_install ? `<button class="btn btn-sm btn-primary" id="upd-install">Installer et redémarrer${u.download_size
+      ? ` (${(u.download_size / 1024 / 1024).toFixed(u.download_size < 10485760 ? 1 : 0).replace('.', ',')} Mo)` : ''}</button>` : ''}
     <a class="btn btn-sm" href="${esc(u.url)}" target="_blank" rel="noopener">Télécharger depuis GitHub</a>
     <button class="icon-btn" id="upd-close" aria-label="Fermer">✕</button>`;
   document.querySelector('.topbar').after(bar);
   bar.querySelector('#upd-close').onclick = () => bar.remove();
   const inst = bar.querySelector('#upd-install');
-  if (inst) inst.onclick = async () => {
-    inst.disabled = true;
-    inst.textContent = 'Téléchargement…';
-    try {
-      await api.post('/app/install-update');
-      bar.innerHTML = '⏳ Installation de la mise à jour… L\'application va redémarrer.';
-    } catch (e) {
-      toast(`${e.message} — utilisez « Télécharger depuis GitHub »`, 'error');
-      inst.disabled = false;
-      inst.textContent = 'Réessayer';
-    }
-  };
+  if (inst) inst.onclick = () => runUpdate(u);
 }
 
 async function start() {
@@ -198,3 +189,21 @@ start();
 
 // Tri et recherche dans tous les tableaux.
 initTables();
+
+// Bouton « Contraste » (en bas à gauche) : réglage propre à cet ordinateur, gardé d'une ouverture à l'autre.
+(function contrastToggle() {
+  const btn = document.getElementById('contrast-toggle');
+  const apply = (on) => {
+    document.documentElement.classList.toggle('high-contrast', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  };
+  let on = false;
+  try { on = localStorage.getItem('bcd-contrast') === '1'; } catch { /* stockage indisponible */ }
+  apply(on);
+  btn.onclick = () => {
+    on = !on;
+    apply(on);
+    try { localStorage.setItem('bcd-contrast', on ? '1' : ''); } catch { /* stockage indisponible */ }
+    toast(on ? 'Contraste élevé activé' : 'Contraste normal');
+  };
+})();

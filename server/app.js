@@ -28,10 +28,10 @@ function loadUser(db, token) {
  * `backupDir` (dossier des sauvegardes automatiques, version bureau),
  * `autoCovers` (cherche la couverture de chaque livre enregistré), `coverPauseMs` (pause entre deux livres).
  */
-export function createApp(db, { lookupIsbn, backupDir, appInfo, installUpdate, checkUpdate, chooseFolder, autoCovers = false, coverPauseMs } = {}) {
+export function createApp(db, { lookupIsbn, backupDir, appInfo, installUpdate, updateProgress, checkUpdate, chooseFolder, autoCovers = false, coverPauseMs } = {}) {
   const router = new Router();
   const covers = createCoverService(db, { pauseMs: coverPauseMs ?? 1000 });
-  const deps = { lookupIsbn, backupDir, appInfo, installUpdate, checkUpdate, chooseFolder, covers, autoCovers };
+  const deps = { lookupIsbn, backupDir, appInfo, installUpdate, updateProgress, checkUpdate, chooseFolder, covers, autoCovers };
   authRoutes(router, deps);
   documentRoutes(router, deps);
   loanRoutes(router, deps);

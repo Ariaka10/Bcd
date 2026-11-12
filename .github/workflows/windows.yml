@@ -73,6 +73,41 @@ jobs:
           Write-Host $text
           if (-not $text.StartsWith('OK')) { throw "Échec du démarrage de la version zip" }
 
+      # Mise à jour légère de la version zip : la partie « application » seule (app.asar) et sa description
+      # (version du moteur Electron, empreinte). Testée en remplaçant app.asar dans la version zip dézippée.
+      - name: Préparer la mise à jour légère (version zip)
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          cp dist/win-unpacked/resources/app.asar "dist/BCD-app-$VERSION.asar"
+          node -e "
+            const fs = require('fs'), crypto = require('crypto');
+            const v = process.argv[1], f = 'dist/BCD-app-' + v + '.asar', buf = fs.readFileSync(f);
+            const electron = require('./node_modules/electron/package.json').version;
+            const m = { version: v, electron, sha256: crypto.createHash('sha256').update(buf).digest('hex'), size: buf.length };
+            fs.writeFileSync('dist/BCD-maj-' + v + '.json', JSON.stringify(m, null, 2));
+            console.log(m);
+          " "$VERSION"
+
+      - name: Tester la mise à jour légère sur la version zip
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'bcd-zip'
+          $res = Join-Path $dir 'resources'
+          $asar = Get-ChildItem dist\BCD-app-*.asar | Select-Object -First 1
+          # Comme le script de mise à jour : fichier téléchargé, copie de secours, puis remplacement de app.asar
+          Copy-Item $asar.FullName (Join-Path $res 'app-maj.bin')
+          Copy-Item (Join-Path $res 'app.asar') (Join-Path $res 'app-precedente.asar.bak')
+          Move-Item -Force (Join-Path $res 'app-maj.bin') (Join-Path $res 'app.asar')
+          $result = Join-Path $env:RUNNER_TEMP 'bcd-smoke-patch.txt'
+          $env:BCD_SMOKE_TEST = $result
+          $env:BCD_DATA_DIR = Join-Path $env:RUNNER_TEMP 'bcd-data-zip'
+          $p = Start-Process -FilePath (Join-Path $dir 'BCD.exe') -PassThru
+          if (-not $p.WaitForExit(120000)) { $p.Kill(); throw "La version mise à jour ne s'est pas fermée à temps" }
+          $text = Get-Content $result -Raw
+          Write-Host $text
+          if (-not $text.StartsWith('OK')) { throw "Échec du démarrage après mise à jour légère" }
+
       # Copie des fichiers dans « Artifacts » (pratique pour tester une branche). Si le stockage de GitHub
       # est en panne, on continue : la Release, elle, est publiée par un autre service.
       - name: Mettre les fichiers à disposition
@@ -135,3 +170,5 @@ jobs:
           files: |
             dist/Installer-BCD-*.exe
             dist/BCD-*-sans-installation.zip
+            dist/BCD-app-*.asar
+            dist/BCD-maj-*.json

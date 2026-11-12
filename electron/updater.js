@@ -59,7 +59,7 @@ export async function checkForUpdate() {
     const res = await net.fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
       headers: { Accept: 'application/vnd.github+json', ...UA },
     });
-    if (res.status === 404) throw new Error('aucune version publiée accessible (le dépôt GitHub est peut-être privé)');
+    if (res.status === 404) throw new Error('aucune version publiée pour le moment');
     if (!res.ok) throw new Error(`GitHub : erreur ${res.status}`);
     const rel = await res.json();
     const version = String(rel.tag_name ?? '').replace(/^v/, '');

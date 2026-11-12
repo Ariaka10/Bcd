@@ -22,20 +22,6 @@ export const DOC_TYPES = {
   autre: { label: 'Autre', prefix: 'DIV' },
 };
 
-/** Grandes classes Dewey, adaptées au primaire. */
-export const DEWEY_CLASSES = {
-  '000': 'Généralités, informatique',
-  '100': 'Philosophie, psychologie, émotions',
-  '200': 'Religions, mythologies',
-  '300': 'Société, citoyenneté, école',
-  '400': 'Langues',
-  '500': 'Sciences de la nature',
-  '600': 'Techniques, corps humain, cuisine',
-  '700': 'Arts, loisirs, sports',
-  '800': 'Littérature',
-  '900': 'Histoire, géographie, biographies',
-};
-
 // Du plus précis au plus général : la première règle trouvée gagne.
 const DEWEY_KEYWORDS = [
   ['dinosaure', '567'], ['prehistoire', '930'],

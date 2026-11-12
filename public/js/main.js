@@ -72,11 +72,6 @@ const ROUTES = [
   [/^\/mes-prets$/, eleve, ['eleve']],
 ];
 
-export async function refreshUser() {
-  state.user = (await api.get('/me')).user;
-  renderNav();
-}
-
 function renderNav() {
   const nav = $('#nav');
   const u = state.user;

@@ -2,6 +2,13 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
+## [1.6.1] — 2026-11-12
+
+### Corrigé
+- **Couleurs plus contrastées** : fond, cartes, bordures et texte secondaire se distinguent mieux sur tous les écrans
+  (certains écrans d'ordinateur effaçaient les teintes trop claires). Lignes des tableaux alternées.
+- **Mode « contraste élevé » de Windows** : les cartes, boutons et tableaux gardent des bordures visibles.
+
 ## [1.6.0] — 2026-11-12
 
 ### Ajouté

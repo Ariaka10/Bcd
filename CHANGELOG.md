@@ -2,7 +2,7 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
-## [1.8.0] — 2026-11-15
+## [1.7.1] — 2026-11-15
 
 ### Ajouté
 - **Recherche de la couverture par titre et auteur**, depuis la fiche du livre (bouton « 🔎 Chercher par titre et auteur ») :

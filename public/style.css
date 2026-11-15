@@ -343,7 +343,6 @@ a.kid-loan { text-decoration: none; color: inherit; }
 .brand span:last-child { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; }
 
 /* v1.2 : couvertures et import */
-.cover-actions { display: grid; gap: .3rem; margin-top: .5rem; }
 .cover-box { display: grid; grid-template-columns: 110px 1fr; gap: .8rem; align-items: start; }
 .map-table select { width: auto; min-width: 14rem; }
 
@@ -490,8 +489,14 @@ html.high-contrast .badge { outline: 1px solid rgba(0, 0, 0, .35); }
 .progress-busy { animation: busy 1.2s ease-in-out infinite alternate; opacity: .6; }
 @keyframes busy { from { opacity: .25; } to { opacity: .85; } }
 
-/* Fiche d'un livre : colonne de la couverture sur un fond distinct */
-.doc-detail > :first-child { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: .75rem;
+/* Fiche d'un livre : colonne de la couverture sur un fond distinct, un seul bouton « Couverture » (menu) */
+.doc-detail > :first-child { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: .6rem;
   align-self: start; }
-.doc-detail > :first-child .cover-actions .btn:not(.btn-ghost) { background: var(--surface); }
-.doc-detail > :first-child .cover-actions .btn:not(.btn-ghost):hover { background: var(--primary-soft); }
+.cover-menu { position: relative; margin-top: .5rem; text-align: center; }
+.cover-menu > summary { list-style: none; width: 100%; justify-content: center; background: var(--surface); }
+.cover-menu > summary::-webkit-details-marker { display: none; }
+.cover-menu-list { position: absolute; left: 0; top: calc(100% + 4px); z-index: 60; min-width: 270px; display: grid;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: .3rem; }
+.cover-menu-list button { text-align: left; white-space: nowrap; padding: .55rem .7rem; border: 0; border-radius: 7px; background: none;
+  color: var(--text); font: inherit; cursor: pointer; }
+.cover-menu-list button:hover, .cover-menu-list button:focus-visible { background: var(--primary-soft); }

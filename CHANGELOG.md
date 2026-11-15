@@ -12,7 +12,9 @@ Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeu
   de modification. Même chose après l'ajout d'un livre et avec le bouton « Annuler ».
 
 ### Modifié
-- **Fiche d'un livre** : la colonne de la couverture a son propre fond, distinct du reste de la fiche.
+- **Fiche d'un livre** : la colonne de la couverture a son propre fond, distinct du reste de la fiche, et ses trois
+  boutons sont réunis dans un seul bouton « 🖼️ Couverture ▾ » (menu : photo ou image du PC, recherche par titre
+  et auteur, retrait de l'image). La fiche reste compacte même quand la notice est courte.
 
 ## [1.7.1] — 2026-11-15
 

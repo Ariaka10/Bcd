@@ -42,10 +42,12 @@ function renderDetail(app, d) {
     <div class="card doc-detail">
       <div>${cover(d, 'cover-lg')}
         ${coverCredit(d)}
-        <div class="cover-actions no-print">
-          <button class="btn btn-sm" id="set-cover">📷 ${d.cover_url ? 'Changer la couverture' : 'Ajouter une couverture'}</button>
-          <button class="btn btn-sm" id="search-cover" title="Cherche sur Internet avec le titre et l'auteur, puis vous choisissez">🔎 Chercher par titre et auteur</button>
-          ${d.cover_url ? '<button class="btn btn-sm btn-ghost" id="rm-cover">Retirer l\'image</button>' : ''}</div></div>
+        <details class="cover-menu no-print">
+          <summary class="btn btn-sm">🖼️ Couverture ▾</summary>
+          <div class="cover-menu-list" role="menu">
+            <button type="button" role="menuitem" id="set-cover">📷 ${d.cover_url ? 'Changer : photo ou image du PC' : 'Photo ou image du PC'}</button>
+            <button type="button" role="menuitem" id="search-cover">🔎 Chercher par titre et auteur</button>
+            ${d.cover_url ? '<button type="button" role="menuitem" id="rm-cover">🗑️ Retirer l\'image</button>' : ''}</div></details></div>
       <div>
         <h1>${esc(d.title)}</h1>
         ${d.subtitle ? `<p class="muted" style="margin:0">${esc(d.subtitle)}</p>` : ''}
@@ -95,6 +97,15 @@ function renderDetail(app, d) {
     } catch (e) { toast(e.message, 'error'); }
   };
   $('#search-cover').onclick = () => searchCoverDialog(d);
+  // Menu « Couverture » : se referme après un choix, un clic ailleurs ou la touche Échap.
+  const menu = $('.cover-menu');
+  menu.addEventListener('click', (e) => { if (e.target.closest('[role=menuitem]')) menu.open = false; });
+  const closeMenu = (e) => {
+    if (!document.body.contains(menu)) return document.removeEventListener('click', closeMenu);
+    if (!menu.contains(e.target)) menu.open = false;
+  };
+  document.addEventListener('click', closeMenu);
+  menu.addEventListener('keydown', (e) => { if (e.key === 'Escape') { menu.open = false; $('summary', menu).focus(); } });
   if ($('#rm-cover')) $('#rm-cover').onclick = async () => {
     if (!(await confirmBox('Retirer l\'image de couverture de ce livre ?'))) return;
     await api.del(`/documents/${d.id}/cover`);

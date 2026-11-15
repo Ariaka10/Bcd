@@ -44,6 +44,7 @@ function renderDetail(app, d) {
         ${coverCredit(d)}
         <div class="cover-actions no-print">
           <button class="btn btn-sm" id="set-cover">📷 ${d.cover_url ? 'Changer la couverture' : 'Ajouter une couverture'}</button>
+          <button class="btn btn-sm" id="search-cover" title="Cherche sur Internet avec le titre et l'auteur, puis vous choisissez">🔎 Chercher par titre et auteur</button>
           ${d.cover_url ? '<button class="btn btn-sm btn-ghost" id="rm-cover">Retirer l\'image</button>' : ''}</div></div>
       <div>
         <h1>${esc(d.title)}</h1>
@@ -93,6 +94,7 @@ function renderDetail(app, d) {
       navigate(location.hash);
     } catch (e) { toast(e.message, 'error'); }
   };
+  $('#search-cover').onclick = () => searchCoverDialog(d);
   if ($('#rm-cover')) $('#rm-cover').onclick = async () => {
     if (!(await confirmBox('Retirer l\'image de couverture de ce livre ?'))) return;
     await api.del(`/documents/${d.id}/cover`);
@@ -168,6 +170,56 @@ async function reserveDialog(d) {
     }
   }, 200);
   $('#f', dlg).onsubmit = (e) => e.preventDefault();
+}
+
+/**
+ * Recherche de la couverture avec le titre et l'auteur seulement : plusieurs propositions,
+ * l'utilisateur valide celle qui correspond au livre (ou aucune). Rien n'est enregistré sans validation.
+ */
+async function searchCoverDialog(d) {
+  const dlg = modal('Chercher la couverture', `<p class="muted">Recherche de « ${esc(d.title)} »${d.authors ? ` — ${esc(d.authors)}` : ''}
+    sur Internet (BnF, Open Library, Google Books)…</p><div class="progress"><span style="width:100%" class="progress-busy"></span></div>`, { wide: true });
+  let r;
+  try {
+    r = await api.post(`/documents/${d.id}/cover/search`, {});
+  } catch (e) {
+    if (dlg.open) $('.modal-body', dlg).innerHTML = `<p>${esc(e.message)}</p><div class="actions"><button class="btn" data-close>Fermer</button></div>`;
+    return;
+  }
+  if (!dlg.open) return;
+  const body = $('.modal-body', dlg);
+  if (!r.proposals.length) {
+    body.innerHTML = `<p>Aucune couverture trouvée avec ce titre et cet auteur.</p>
+      <p class="muted small">Vérifiez l'orthographe du titre (bouton « Modifier »), ou prenez la couverture en photo.</p>
+      <div class="actions"><button class="btn" data-close>Fermer</button></div>`;
+    return;
+  }
+  body.innerHTML = `<p>Cliquez sur la couverture qui correspond <b>exactement</b> à votre livre (même édition), puis validez.</p>
+    <div class="cover-choices">${r.proposals.map((p) => `
+      <button type="button" class="cover-choice" data-i="${p.index}" aria-pressed="false">
+        <img src="${p.image}" alt="">
+        <span class="small"><b>${esc(p.title ?? '')}</b>${p.authors ? `<br>${esc(p.authors)}` : ''}
+          ${p.publisher || p.year ? `<br><span class="muted">${esc([p.publisher, p.year].filter(Boolean).join(', '))}</span>` : ''}
+          <br><span class="muted">${esc(ORIGINS[p.origin] ?? 'Internet')}</span></span></button>`).join('')}</div>
+    <div class="actions"><button class="btn" data-close>Aucune ne correspond</button>
+      <button class="btn btn-primary" id="choose-ok" disabled>✓ Valider cette couverture</button></div>`;
+  let chosen = null;
+  for (const b of $$('.cover-choice', dlg)) {
+    b.onclick = () => {
+      for (const o of $$('.cover-choice', dlg)) o.setAttribute('aria-pressed', o === b ? 'true' : 'false');
+      chosen = Number(b.dataset.i);
+      $('#choose-ok', dlg).disabled = false;
+    };
+    b.ondblclick = () => $('#choose-ok', dlg).click();
+  }
+  $('#choose-ok', dlg).onclick = async () => {
+    try {
+      await api.post(`/documents/${d.id}/cover/choose`, { index: chosen });
+      dlg.close();
+      toast('Couverture enregistrée');
+      navigate(location.hash);
+    } catch (e) { toast(e.message, 'error'); }
+  };
 }
 
 const ORIGINS = { bnf: 'BnF', openlibrary: 'Open Library', google: 'Google Books', amazon: 'Amazon' };

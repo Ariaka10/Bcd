@@ -2,6 +2,14 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
+## [1.7.1] — 2026-11-15
+
+### Ajouté
+- **Recherche de la couverture par titre et auteur**, depuis la fiche du livre (bouton « 🔎 Chercher par titre et auteur ») :
+  jusqu'à 12 couvertures proposées (BnF, Open Library, Google Books) avec titre, auteur, éditeur et année ;
+  on clique sur celle qui correspond à l'édition du livre puis on valide. Rien n'est enregistré sans validation.
+  Utile pour les livres sans ISBN, ou quand la recherche par ISBN n'a rien donné.
+
 ## [1.7.0] — 2026-11-12
 
 ### Ajouté

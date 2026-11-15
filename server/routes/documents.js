@@ -8,7 +8,7 @@ import { toCsv } from '../csv.js';
 import { fixFields } from '../text.js';
 import { getSettings } from '../db.js';
 import { readTable, guessMapping, importCatalog, IMPORT_FIELDS } from '../catalog-import.js';
-import { storeCover, imageInfo } from '../covers.js';
+import { storeCover, imageInfo, coversByTitle, isRejectedIn, rememberProposals, proposalFor, forgetProposals } from '../covers.js';
 
 const DOC_FIELDS = [
   'isbn', 'title', 'subtitle', 'authors', 'publisher', 'pub_year', 'pages', 'series', 'series_number',
@@ -259,6 +259,37 @@ export default function (r, deps) {
     if (!mime) throw new HttpError(400, 'Format d\'image non reconnu (JPEG, PNG, GIF ou WebP)');
     const id = Number(params.id);
     storeCover(db, id, { mime, data: raw, source: 'manuel' });
+    return { ok: true, cover_url: db.prepare('SELECT cover_url FROM documents WHERE id = ?').get(id).cover_url };
+  });
+
+  /* ----- Recherche de la couverture par titre et auteur : propositions à valider ----- */
+
+  r.post('/api/documents/:id/cover/search', catalog, async ({ db, params }) => {
+    const doc = db.prepare('SELECT id, title, authors FROM documents WHERE id = ?').get(params.id);
+    if (!doc) throw new HttpError(404, 'Document introuvable');
+    let list;
+    try {
+      list = await coversByTitle(doc, isRejectedIn(db));
+    } catch {
+      throw new HttpError(502, 'Recherche impossible : vérifiez la connexion à Internet');
+    }
+    rememberProposals(doc.id, list);
+    return {
+      query: { title: doc.title, authors: doc.authors },
+      proposals: list.map((c, index) => ({
+        index, origin: c.origin, title: c.title ?? null, authors: c.authors || null, publisher: c.publisher || null, year: c.year ?? null,
+        image: `data:${c.mime};base64,${Buffer.from(c.data).toString('base64')}`,
+      })),
+    };
+  });
+
+  r.post('/api/documents/:id/cover/choose', catalog, ({ db, params, body }) => {
+    const id = Number(params.id);
+    if (!db.prepare('SELECT 1 FROM documents WHERE id = ?').get(id)) throw new HttpError(404, 'Document introuvable');
+    const c = proposalFor(id, Number(body?.index));
+    if (!c) throw new HttpError(410, 'Proposition expirée : relancez la recherche');
+    storeCover(db, id, { mime: c.mime, data: c.data, source: 'internet', origin: c.origin });
+    forgetProposals(id);
     return { ok: true, cover_url: db.prepare('SELECT cover_url FROM documents WHERE id = ?').get(id).cover_url };
   });
 

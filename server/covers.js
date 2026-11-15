@@ -8,7 +8,7 @@
 import crypto from 'node:crypto';
 import { tx, getSettings } from './db.js';
 import { toIsbn13 } from './isbn.js';
-import { fetchWithTimeout, fromBnf } from './notice.js';
+import { fetchWithTimeout, fromBnf, parseUnimarc, unimarcToNotice } from './notice.js';
 
 const MIN_BYTES = 1500; // en dessous : image vide ou pixel de remplacement
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -156,7 +156,7 @@ export function storeCover(db, id, { mime, data, source = 'manuel', origin = nul
 
 export const amazonEnabled = (db) => getSettings(db).covers_amazon === '1';
 
-const isRejectedIn = (db) => (hash) => !!db.prepare('SELECT 1 FROM cover_rejects WHERE hash = ?').get(hash);
+export const isRejectedIn = (db) => (hash) => !!db.prepare('SELECT 1 FROM cover_rejects WHERE hash = ?').get(hash);
 
 /**
  * Une même image trouvée pour deux livres différents est une image « pas de couverture » d'un site :
@@ -298,3 +298,95 @@ export function createCoverService(db, { pauseMs = 1000 } = {}) {
     },
   };
 }
+
+/* ----- Recherche par titre et auteur (bouton de la fiche du livre) ----- */
+
+const BNF_SRU = 'https://catalogue.bnf.fr/api/SRU';
+/** Mots utiles d'un titre ou d'un nom, pour les requêtes (sans ponctuation ni guillemets). */
+const words = (s) => String(s ?? '').replace(/[«»"“”(){}[\]:;,.!?/\\'’-]+/g, ' ').replace(/\s+/g, ' ').trim();
+/** Nom du premier auteur (« Donaldson, Julia ; Scheffler, Axel » → « Donaldson »). */
+export const firstAuthorName = (authors) => words(String(authors ?? '').split(/[;&]/)[0].split(',')[0]);
+
+/** Livres de la BnF correspondant au titre et à l'auteur : couverture par identifiant (ark). */
+async function bnfByTitle(title, author) {
+  let query = `bib.title all "${title}"`;
+  if (author) query += ` and bib.author all "${author}"`;
+  const url = `${BNF_SRU}?version=1.2&operation=searchRetrieve&recordSchema=unimarcXchange&maximumRecords=15&query=${encodeURIComponent(query)}`;
+  const res = await fetchWithTimeout(url);
+  if (!res.ok) throw new Error(`BnF : HTTP ${res.status}`);
+  const out = [];
+  for (const rec of (await res.text()).split(/<(?:[\w-]+:)?record>/).slice(1)) {
+    const ark = arkOf(rec);
+    if (!ark) continue;
+    const n = unimarcToNotice(parseUnimarc(rec));
+    out.push({ url: bnfCover(`idArk=${ark}`), title: n.title, authors: n.authors, publisher: n.publisher, year: n.pub_year });
+  }
+  return out;
+}
+
+async function openLibraryByTitle(title, author) {
+  const q = `title=${encodeURIComponent(title)}${author ? `&author=${encodeURIComponent(author)}` : ''}`;
+  const res = await fetchWithTimeout(`https://openlibrary.org/search.json?${q}&fields=title,author_name,cover_i,first_publish_year&limit=6`);
+  if (!res.ok) throw new Error(`Open Library : HTTP ${res.status}`);
+  return ((await res.json()).docs ?? []).filter((d) => d.cover_i).map((d) => ({
+    url: `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg?default=false`,
+    title: d.title, authors: (d.author_name ?? []).join(', '), year: d.first_publish_year ?? null,
+  }));
+}
+
+async function googleByTitle(title, author) {
+  const q = `intitle:${title}${author ? `+inauthor:${author}` : ''}`;
+  const res = await fetchWithTimeout(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=6`);
+  if (!res.ok) throw new Error(`Google Books : HTTP ${res.status}`);
+  return ((await res.json()).items ?? []).map((i) => i.volumeInfo ?? {}).filter((v) => v.imageLinks?.thumbnail).map((v) => ({
+    url: v.imageLinks.thumbnail.replace('http://', 'https://'),
+    title: v.title, authors: (v.authors ?? []).join(', '), publisher: v.publisher, year: Number(String(v.publishedDate ?? '').slice(0, 4)) || null,
+  }));
+}
+
+/**
+ * Couvertures possibles pour un livre, d'après son titre et son auteur seulement (pas l'ISBN).
+ * Rien n'est enregistré : l'utilisateur choisit celle qui correspond (ou aucune).
+ * Résultat : [{ mime, data, origin, title, authors, publisher, year }], 12 au plus, sans doublon.
+ */
+export async function coversByTitle(doc, isRejected = () => false) {
+  const title = words(doc.title);
+  if (!title) return [];
+  const author = firstAuthorName(doc.authors);
+  const lists = await Promise.allSettled([bnfByTitle, openLibraryByTitle, googleByTitle].map((f) => f(title, author)));
+  if (lists.every((l) => l.status === 'rejected')) throw lists[0].reason;
+  // Alternance des sources (BnF, Open Library, Google, BnF…) pour varier les éditions proposées.
+  const found = lists.map((l) => (l.status === 'fulfilled' ? l.value : []));
+  const order = [];
+  for (let i = 0; found.some((f) => i < f.length); i++) for (const f of found) if (f[i]) order.push(f[i]);
+  const images = await Promise.all(order.slice(0, 30).map(async (c) => {
+    try {
+      const img = await fetchImage(c.url);
+      return img && { ...c, mime: img.mime, data: img.data, origin: originOf(c.url) };
+    } catch {
+      return null;
+    }
+  }));
+  const seen = new Set();
+  const out = [];
+  for (const img of images) {
+    if (!img) continue;
+    const h = hashOf(img.data);
+    if (seen.has(h) || isRejected(h)) continue;
+    seen.add(h);
+    const { url, ...rest } = img;
+    out.push(rest);
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+
+/** Propositions gardées quelques minutes, le temps que l'utilisateur choisisse. */
+const proposals = new Map();
+export function rememberProposals(id, list) {
+  const now = Date.now();
+  for (const [k, v] of proposals) if (now - v.at > 30 * 60_000) proposals.delete(k);
+  proposals.set(Number(id), { at: now, list });
+}
+export const proposalFor = (id, index) => proposals.get(Number(id))?.list[index] ?? null;
+export const forgetProposals = (id) => proposals.delete(Number(id));

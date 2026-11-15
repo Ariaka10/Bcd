@@ -60,6 +60,8 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
 - **Couvertures automatiques** : récupérées à l'enregistrement (service officiel de la BnF, Open Library, Google Books,
   Amazon en option) et gardées sur l'ordinateur,
   donc visibles même sans Internet ; bouton pour chercher en une fois celles des livres déjà enregistrés ou importés.
+  Sur la fiche d'un livre, bouton **« 🔎 Chercher par titre et auteur »** : plusieurs couvertures sont proposées
+  (utile sans ISBN ou pour une autre édition), vous validez celle qui correspond.
   Sinon, photo ou image du PC (ou collée avec Ctrl+V).
 - **Cotes calculées automatiquement** : genre + 3 lettres de l'auteur (`A RAM`, `R DAH`, `BD AST`…),
   indice Dewey pour les documentaires (`590 LED`).
@@ -100,7 +102,7 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
 
 ### Sécurité des données
 - Les données restent **sur l'ordinateur** (`Documents\BCD`), rien n'est ouvert sur le réseau.
-  Internet ne sert qu'à chercher les notices et les couvertures par ISBN (BnF, Open Library, Google Books)
+  Internet ne sert qu'à chercher les notices et les couvertures par ISBN, titre ou auteur (BnF, Open Library, Google Books)
   et à vérifier les mises à jour : aucune donnée d'élève n'est envoyée.
 - **Sauvegarde automatique** toutes les 30 minutes pendant l'utilisation et à chaque fermeture, **copie sur clé USB**,
   restauration en un clic. Chaque modification est enregistrée immédiatement : une coupure de courant ne fait pas perdre la journée.

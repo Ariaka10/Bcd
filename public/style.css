@@ -478,3 +478,14 @@ html.high-contrast textarea, html.high-contrast .btn:not(.btn-primary):not(.btn-
 html.high-contrast th, html.high-contrast td { border-bottom-color: #a39a85; }
 html.high-contrast a { text-decoration-thickness: 2px; }
 html.high-contrast .badge { outline: 1px solid rgba(0, 0, 0, .35); }
+
+/* Choix de la couverture trouvée par titre et auteur */
+.cover-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .75rem; margin: .75rem 0;
+  max-height: 60vh; overflow-y: auto; padding: 2px; }
+.cover-choice { display: grid; gap: .4rem; align-content: start; text-align: left; padding: .5rem; border: 2px solid var(--line);
+  border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.cover-choice img { width: 100%; height: 180px; object-fit: contain; background: var(--surface-2); border-radius: 6px; }
+.cover-choice:hover { border-color: var(--primary); }
+.cover-choice[aria-pressed="true"] { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.progress-busy { animation: busy 1.2s ease-in-out infinite alternate; opacity: .6; }
+@keyframes busy { from { opacity: .25; } to { opacity: .85; } }

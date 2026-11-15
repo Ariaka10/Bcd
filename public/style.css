@@ -489,3 +489,9 @@ html.high-contrast .badge { outline: 1px solid rgba(0, 0, 0, .35); }
 .cover-choice[aria-pressed="true"] { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
 .progress-busy { animation: busy 1.2s ease-in-out infinite alternate; opacity: .6; }
 @keyframes busy { from { opacity: .25; } to { opacity: .85; } }
+
+/* Fiche d'un livre : colonne de la couverture sur un fond distinct */
+.doc-detail > :first-child { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: .75rem;
+  align-self: start; }
+.doc-detail > :first-child .cover-actions .btn:not(.btn-ghost) { background: var(--surface); }
+.doc-detail > :first-child .cover-actions .btn:not(.btn-ghost):hover { background: var(--primary-soft); }

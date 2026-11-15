@@ -133,22 +133,48 @@ async function download(url, expectedSize) {
 
 /**
  * Script lancé à la fermeture de la version zip : attend la fin de BCD, remplace app.asar par la nouvelle version
- * (en gardant l'ancienne en secours), puis rouvre BCD.
+ * (en gardant l'ancienne en secours), rouvre BCD, puis s'efface.
+ * « ping » sert de pause : « timeout » refuse de fonctionner sans fenêtre (entrée clavier absente).
  */
-export function swapScript({ pid, resources, exe }) {
+export function swapScript({ pid, resources, exe, launcher }) {
   const q = (p) => `"${p}"`;
+  const wait = 'ping -n 2 127.0.0.1 >nul';
   return [
     '@echo off',
     'chcp 65001 >nul',
     ':attente',
-    `tasklist /FI "PID eq ${pid}" 2>nul | find "${pid}" >nul && (timeout /t 1 /nobreak >nul & goto attente)`,
-    'timeout /t 1 /nobreak >nul',
+    `tasklist /FI "PID eq ${pid}" 2>nul | find "${pid}" >nul && (${wait} & goto attente)`,
+    wait,
     `copy /y ${q(path.join(resources, 'app.asar'))} ${q(path.join(resources, 'app-precedente.asar.bak'))} >nul`,
     `move /y ${q(path.join(resources, 'app-maj.bin'))} ${q(path.join(resources, 'app.asar'))} >nul`,
     `start "" ${q(exe)}`,
-    '(goto) 2>nul & del "%~f0"',
+    launcher ? `del ${q(launcher)} >nul 2>nul` : '',
+    '(goto) 2>nul & del "%~f0" & exit',
     '',
-  ].join('\r\n');
+  ].filter((l, i, a) => l || i === a.length - 1).join('\r\n');
+}
+
+/**
+ * Lanceur invisible : Windows Script Host exécute le script sans ouvrir de fenêtre d'invite de commande
+ * (0 = fenêtre cachée, False = ne pas attendre). Écrit en UTF-16 : wscript lit mal l'UTF-8 (noms accentués).
+ * En VBScript, "" dans une chaîne donne un guillemet : la commande lancée est  cmd.exe /c "C:\...\script.cmd"
+ */
+export function hiddenLauncher(script) {
+  const quoted = `""${script.replace(/"/g, '')}""`;
+  const text = `CreateObject("WScript.Shell").Run "cmd.exe /c ${quoted}", 0, False\r\n`;
+  return Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, 'utf16le')]);
+}
+
+/** Lance le script de remplacement sans fenêtre ; si Windows Script Host est désactivé, lancement classique. */
+async function launchHidden(script, launcher) {
+  const ok = await new Promise((resolve) => {
+    const p = spawn('wscript.exe', ['//B', '//NoLogo', launcher], { detached: true, stdio: 'ignore', windowsHide: true });
+    p.on('error', () => resolve(false));
+    p.on('exit', (code) => resolve(code === 0));
+    setTimeout(() => resolve(true), 10_000);
+    p.unref();
+  });
+  if (!ok) spawn('cmd.exe', ['/c', script], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
 }
 
 /** Lance la mise à jour (en arrière-plan) ; la progression se suit avec updateProgress(). */
@@ -183,8 +209,11 @@ async function run(u, mode) {
   // Nom sans « .asar » : Electron traite ces fichiers à part.
   fs.writeFileSync(path.join(resources, 'app-maj.bin'), buf);
   const script = path.join(os.tmpdir(), `bcd-maj-${process.pid}.cmd`);
-  fs.writeFileSync(script, swapScript({ pid: process.pid, resources, exe: process.execPath }), 'utf8');
+  const launcher = path.join(os.tmpdir(), `bcd-maj-${process.pid}.vbs`);
+  fs.writeFileSync(script, swapScript({ pid: process.pid, resources, exe: process.execPath, launcher }), 'utf8');
+  fs.writeFileSync(launcher, hiddenLauncher(script));
   progress = { ...progress, phase: 'restart' };
-  spawn('cmd.exe', ['/c', script], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+  // Sans fenêtre : un processus détaché ne peut pas être caché directement, d'où le passage par wscript.
+  await launchHidden(script, launcher);
   setTimeout(() => app.quit(), 2500);
 }

@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { esc, cover, toast, modal, confirmBox, formData, fmtDate, plural, $, $$, debounce, resizeImage, pickImage, uploadCover } from '../ui.js';
-import { state, navigate, isAdmin, isCataloguer, typeLabel, loadThemes, themeChips } from '../state.js';
+import { state, navigate, leaveTo, isAdmin, isCataloguer, typeLabel, loadThemes, themeChips } from '../state.js';
 import { addToListDialog } from './catalogue.js';
 
 const STATES = { ok: 'Bon état', abime: 'Abîmé', perdu: 'Perdu', reparation: 'En réparation' };
@@ -42,10 +42,12 @@ function renderDetail(app, d) {
     <div class="card doc-detail">
       <div>${cover(d, 'cover-lg')}
         ${coverCredit(d)}
-        <div class="cover-actions no-print">
-          <button class="btn btn-sm" id="set-cover">📷 ${d.cover_url ? 'Changer la couverture' : 'Ajouter une couverture'}</button>
-          <button class="btn btn-sm" id="search-cover" title="Cherche sur Internet avec le titre et l'auteur, puis vous choisissez">🔎 Chercher par titre et auteur</button>
-          ${d.cover_url ? '<button class="btn btn-sm btn-ghost" id="rm-cover">Retirer l\'image</button>' : ''}</div></div>
+        <details class="cover-menu no-print">
+          <summary class="btn btn-sm">🖼️ Couverture ▾</summary>
+          <div class="cover-menu-list" role="menu">
+            <button type="button" role="menuitem" id="set-cover">📷 ${d.cover_url ? 'Changer : photo ou image du PC' : 'Photo ou image du PC'}</button>
+            <button type="button" role="menuitem" id="search-cover">🔎 Chercher par titre et auteur</button>
+            ${d.cover_url ? '<button type="button" role="menuitem" id="rm-cover">🗑️ Retirer l\'image</button>' : ''}</div></details></div>
       <div>
         <h1>${esc(d.title)}</h1>
         ${d.subtitle ? `<p class="muted" style="margin:0">${esc(d.subtitle)}</p>` : ''}
@@ -95,6 +97,15 @@ function renderDetail(app, d) {
     } catch (e) { toast(e.message, 'error'); }
   };
   $('#search-cover').onclick = () => searchCoverDialog(d);
+  // Menu « Couverture » : se referme après un choix, un clic ailleurs ou la touche Échap.
+  const menu = $('.cover-menu');
+  menu.addEventListener('click', (e) => { if (e.target.closest('[role=menuitem]')) menu.open = false; });
+  const closeMenu = (e) => {
+    if (!document.body.contains(menu)) return document.removeEventListener('click', closeMenu);
+    if (!menu.contains(e.target)) menu.open = false;
+  };
+  document.addEventListener('click', closeMenu);
+  menu.addEventListener('keydown', (e) => { if (e.key === 'Escape') { menu.open = false; $('summary', menu).focus(); } });
   if ($('#rm-cover')) $('#rm-cover').onclick = async () => {
     if (!(await confirmBox('Retirer l\'image de couverture de ce livre ?'))) return;
     await api.del(`/documents/${d.id}/cover`);
@@ -278,7 +289,7 @@ function renderForm(app, doc) {
   const field = (name, label, attrs = '', cls = '') => `<label class="${cls}">${label}<input name="${name}" value="${esc(d[name] ?? '')}" ${attrs}></label>`;
   app.innerHTML = `
     <div class="page-head"><h1>${doc ? 'Modifier la notice' : 'Ajouter un document'}</h1>
-      <a href="${doc ? `#/document/${doc.id}` : '#/catalogue'}" class="btn btn-ghost">Annuler</a></div>
+      <button type="button" class="btn btn-ghost" id="cancel-form">Annuler</button></div>
     ${doc ? '' : `<form class="isbn-box" id="isbn-form">
       <label>ISBN du livre <span class="muted small">— le numéro écrit sous le code-barres, au dos (978…)</span>
         <input name="isbn" id="isbn-input" inputmode="numeric" placeholder="978…" autofocus></label>
@@ -335,6 +346,7 @@ function renderForm(app, doc) {
     </form>`;
 
   const form = $('#doc-form');
+  $('#cancel-form').onclick = () => leaveTo(doc ? `#/document/${doc.id}` : '#/catalogue');
   // Périodique : périodicité et abonnement ; les numéros s'ajoutent ensuite depuis sa fiche.
   const syncType = () => {
     const per = form.doc_type.value === 'periodique';
@@ -432,14 +444,14 @@ function renderForm(app, doc) {
         await api.put(`/documents/${doc.id}`, data);
         if (pendingCover) await uploadCover(doc.id, pendingCover);
         toast('Notice enregistrée');
-        navigate(`#/document/${doc.id}`);
+        leaveTo(`#/document/${doc.id}`);
       } else {
         const r = await api.post('/documents', data);
         if (pendingCover) await uploadCover(r.id, pendingCover).catch((e) => toast(e.message, 'error'));
         const next = again ? '#/document/nouveau' : `#/document/${r.id}`;
         if (!r.barcodes.length) {
           toast(`Ajouté — cote ${r.cote}`);
-          return navigate(next);
+          return again ? navigate(next) : leaveTo(next);
         }
         // Le numéro à écrire sur le livre, bien visible.
         const dlg = modal('Livre enregistré ✅', `<div class="number-box">
@@ -449,7 +461,7 @@ function renderForm(app, doc) {
           <div class="actions"><button class="btn btn-primary btn-lg" data-close autofocus>${again ? '➕ Livre suivant' : 'OK'}</button></div>`);
         const here = location.hash;
         // Seulement si l'on est resté sur cette page (fermeture différée par le navigateur).
-        dlg.addEventListener('close', () => { if (location.hash === here) navigate(next); });
+        dlg.addEventListener('close', () => { if (location.hash === here) (again ? navigate(next) : leaveTo(next)); });
       }
     } catch (err) { toast(err.message, 'error'); }
   };

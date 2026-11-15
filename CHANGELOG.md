@@ -2,6 +2,20 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
+## [1.7.2] — 2026-11-15
+
+### Corrigé
+- **Mise à jour de la version zip** : plus de fenêtre d'invite de commande qui reste ouverte. Le remplacement se fait
+  désormais sans aucune fenêtre (avec un lancement classique en secours si Windows Script Host est désactivé).
+  Le CI teste maintenant le vrai script de remplacement, de bout en bout.
+- **Retour après modification d'une fiche** : « ← Retour » ramène à la liste des livres, et non plus au formulaire
+  de modification. Même chose après l'ajout d'un livre et avec le bouton « Annuler ».
+
+### Modifié
+- **Fiche d'un livre** : la colonne de la couverture a son propre fond, distinct du reste de la fiche, et ses trois
+  boutons sont réunis dans un seul bouton « 🖼️ Couverture ▾ » (menu : photo ou image du PC, recherche par titre
+  et auteur, retrait de l'image). La fiche reste compacte même quand la notice est courte.
+
 ## [1.7.1] — 2026-11-15
 
 ### Ajouté

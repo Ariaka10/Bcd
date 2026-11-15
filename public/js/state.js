@@ -4,6 +4,23 @@ import { esc } from './ui.js';
 
 export const state = { user: null, info: null, meta: null, themes: null };
 
+/*
+ * Page précédente : pour quitter un formulaire sans le laisser dans l'historique
+ * (sinon « Retour » depuis la fiche ramènerait au formulaire de modification).
+ */
+let currentHash = location.hash;
+let previousHash = null;
+window.addEventListener('hashchange', () => {
+  if (location.hash !== currentHash) { previousHash = currentHash; currentHash = location.hash; }
+});
+
+/** Quitte la page en cours vers `hash` : retour arrière si l'on vient de là, sinon remplacement dans l'historique. */
+export function leaveTo(hash) {
+  if (location.hash === hash) navigate(hash);
+  else if (previousHash === hash) history.back();
+  else location.replace(hash);
+}
+
 export function navigate(hash) {
   if (location.hash === hash) window.dispatchEvent(new Event('hashchange'));
   else location.hash = hash;

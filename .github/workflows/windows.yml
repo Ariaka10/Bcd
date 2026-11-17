@@ -31,6 +31,21 @@ jobs:
       - name: Tests automatiques
         run: npm test
 
+      # Repérage des clés USB : la commande PowerShell doit fonctionner (pas de clé sur cette machine :
+      # on vérifie avec le disque C:, puis que la liste des clés est simplement vide).
+      - name: Tester le repérage des clés USB
+        shell: bash
+        run: |
+          node --input-type=module -e "
+            const { removableDrives, listDrives } = await import('./electron/drives.js');
+            const disks = await removableDrives(3);
+            console.log('Disques :', disks);
+            if (!disks?.some((d) => d.letter === 'C' && d.serial)) throw new Error('Lecture des lecteurs impossible');
+            const keys = await listDrives();
+            console.log('Clés :', keys);
+            if (!Array.isArray(keys)) throw new Error('Liste des clés invalide');
+          "
+
       - name: Fabriquer l'installateur
         run: npx electron-builder --win --x64 --publish never
 

@@ -149,7 +149,8 @@ export function swapScript({ pid, resources, exe, launcher }) {
     `move /y ${q(path.join(resources, 'app-maj.bin'))} ${q(path.join(resources, 'app.asar'))} >nul`,
     `start "" ${q(exe)}`,
     launcher ? `del ${q(launcher)} >nul 2>nul` : '',
-    '(goto) 2>nul & del "%~f0" & exit',
+    // « exit 0 » : fin sans erreur, sinon le Terminal Windows garde la fenêtre ouverte.
+    '(goto) 2>nul & del "%~f0" & exit 0',
     '',
   ].filter((l, i, a) => l || i === a.length - 1).join('\r\n');
 }

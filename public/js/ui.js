@@ -1,4 +1,5 @@
 /** Petits utilitaires d'interface. */
+import { speakIfAuto } from './speech.js';
 
 export function esc(v) {
   return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -20,6 +21,7 @@ export function toast(msg, type = 'ok') {
   el.className = `toast toast-${type}`;
   el.textContent = msg;
   box.append(el);
+  speakIfAuto(msg);
   setTimeout(() => el.classList.add('hide'), type === 'error' ? 5000 : 2800);
   setTimeout(() => el.remove(), type === 'error' ? 5600 : 3400);
 }

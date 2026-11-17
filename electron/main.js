@@ -11,6 +11,8 @@ import { openDb } from '../server/db.js';
 import { createApp } from '../server/app.js';
 import { autoBackup, backupFileName, copyToExtraDir, startPeriodicBackups } from '../server/backup.js';
 import { setFetch } from '../server/notice.js';
+import { createUsbWatcher } from '../server/usb.js';
+import { listDrives } from './drives.js';
 import { DatabaseSync } from 'node:sqlite';
 import { checkForUpdate, updateInfo, installUpdate, updateProgress } from './updater.js';
 
@@ -19,6 +21,7 @@ const SMOKE_TEST = process.env.BCD_SMOKE_TEST; // chemin d'un fichier de résult
 
 let db;
 let server;
+let usb;
 let win;
 let dataDir;
 let backupDir;
@@ -66,7 +69,10 @@ async function start() {
   logoutEveryone();
 
   setFetch((url, opts) => net.fetch(url, opts));
+  // Clés USB : repérées dès qu'elles sont branchées (sauvegarde proposée, ou faite si la clé est mémorisée).
+  usb = createUsbWatcher(db, { listDrives, onError: (e) => console.error('Clés USB :', e) }).start();
   server = http.createServer(createApp(db, {
+    usb,
     backupDir,
     autoCovers: true,
     appInfo: updateInfo,
@@ -225,6 +231,13 @@ app.on('before-quit', () => {
     if (dir && hasData()) copyToExtraDir(db, dir);
   } catch (e) {
     console.error('Copie sur la clé impossible :', e);
+  }
+  // Clés mémorisées encore branchées.
+  try {
+    usb?.stop();
+    if (hasData()) usb?.copyOnQuit();
+  } catch (e) {
+    console.error('Copie sur les clés mémorisées impossible :', e);
   }
   server?.close();
   db.close();

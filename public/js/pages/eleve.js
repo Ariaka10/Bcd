@@ -2,12 +2,16 @@
 import { api, qs } from '../api.js';
 import { esc, cover, fmtDate, toast, $, $$ } from '../ui.js';
 import { state, navigate, loadThemes } from '../state.js';
+import { speakButton, dateSpoken } from '../speech.js';
 
 const TYPES = [['album', '🖼️ Albums'], ['conte', '🧚 Contes'], ['documentaire', '🔬 Pour apprendre'], ['bd', '💬 BD'], ['poesie', '🎵 Comptines']];
 const REVIEWS = { 3: '😍', 2: '🙂', 1: '😐' };
 
+const dispoText = (d) => (d.available_count ? 'Il est dans la bibliothèque.' : 'Quelqu\'un l\'a emprunté.');
+
 function bookCard(d) {
   return `<a class="book-card" href="#/document/${d.id}">
+    ${speakButton(`${d.title}. ${dispoText(d)}`)}
     ${cover(d, 'cover-md')}<span class="t">${esc(d.title)}</span>
     <span class="dispo ${d.available_count ? 'yes' : 'no'}">${d.available_count ? '✅ Disponible' : '⏳ Emprunté'}</span>
     ${d.loves ? `<span class="small">😍 ${d.loves}</span>` : ''}</a>`;
@@ -24,11 +28,11 @@ export async function render(app, { path, query }) {
   const current = themes.find((t) => String(t.id) === String(query.theme));
 
   app.innerHTML = `<div style="text-align:center"><h1>Bonjour ${esc(state.user.first_name)} ${esc(state.user.avatar)}</h1>
-      <p class="muted">Quel livre cherches-tu ?</p></div>
+      <p class="muted">Quel livre cherches-tu ? ${speakButton(`Bonjour ${state.user.first_name} ! Quel livre cherches-tu ?`)}</p></div>
     ${themes.length ? `<div class="kid-themes">${themes.map((t) => `<button type="button" data-theme="${t.id}"
         class="${String(query.theme) === String(t.id) ? 'active' : ''}" style="${t.color ? `--chip:${t.color}` : ''}">
-        <span class="kid-theme-emoji">${esc(t.emoji ?? '📚')}</span>${esc(t.name)}</button>`).join('')}</div>`
-    : `<div class="kid-cats">${TYPES.map(([k, l]) => `<button type="button" data-type="${k}" class="${query.type === k ? 'active' : ''}">${l}</button>`).join('')}</div>`}
+        <span class="kid-theme-emoji">${esc(t.emoji ?? '📚')}</span>${esc(t.name)}${speakButton(t.name)}</button>`).join('')}</div>`
+    : `<div class="kid-cats">${TYPES.map(([k, l]) => `<button type="button" data-type="${k}" class="${query.type === k ? 'active' : ''}">${l}${speakButton(l)}</button>`).join('')}</div>`}
     <form class="kid-search" id="f"><input name="q" value="${esc(query.q)}" placeholder="🔎 Un titre, un mot…" autocomplete="off">
       <button class="btn btn-primary">🔎</button></form>
     ${filtering ? `<div class="row" style="justify-content:center;margin-bottom:1rem"><button class="btn btn-lg" id="all">✨ Tous les livres</button></div>` : ''}
@@ -51,15 +55,17 @@ async function myLoans(app) {
   const read = history.filter((l) => l.document_id && !seen.has(l.document_id) && seen.add(l.document_id));
   app.innerHTML = `<h1>${esc(state.user.avatar)} Mes livres</h1>
     ${current.length ? current.map((l) => `<a class="kid-loan ${l.overdue ? 'late' : ''}" href="#/document/${l.document_id}">
+      ${speakButton(`${l.title}. ${l.overdue ? 'Il faut le rapporter vite !' : `À rapporter le ${dateSpoken(l.due_at)}.`}`)}
       ${cover(l)}<div class="grow"><b style="font-size:1.15rem">${esc(l.title)}</b><br>
       ${l.overdue ? `<span>⏰ Il faut le rapporter vite : c'était le ${fmtDate(l.due_at)} !</span>`
         : `<span>📅 À rapporter le <b>${fmtDate(l.due_at)}</b></span>`}</div></a>`).join('')
     : '<div class="empty" style="font-size:1.2rem">Tu n\'as pas de livre en ce moment. <a href="#/">Choisis-en un !</a></div>'}
     ${reservations.length ? `<h2>🔖 Mes réservations</h2>${reservations.map((r) => `<a class="kid-loan" href="#/document/${r.document_id}">
+      ${speakButton(`${r.title}. ${r.status === 'prete' ? 'Il t\'attend ! Demande-le à la maîtresse.' : 'On te le garde quand il revient.'}`)}
       ${cover(r)}<div class="grow"><b style="font-size:1.15rem">${esc(r.title)}</b><br>
       ${r.status === 'prete' ? '🎉 Il t\'attend ! Demande-le à la maîtresse.' : '⏳ On te le garde quand il revient.'}</div></a>`).join('')}` : ''}
     ${read.length ? `<h2>📜 Les livres que j'ai lus</h2><p class="muted">Touche une frimousse pour dire si tu as aimé.</p>
-      <div class="book-grid">${read.map((l) => `<div class="book-card">${cover(l, 'cover-md')}<span class="t">${esc(l.title)}</span>
+      <div class="book-grid">${read.map((l) => `<div class="book-card">${speakButton(`${l.title}. Tu as aimé ce livre ?`)}${cover(l, 'cover-md')}<span class="t">${esc(l.title)}</span>
         <div class="mini-reviews" data-doc="${l.document_id}">${[3, 2, 1].map((n) =>
           `<button class="${reviews[l.document_id] === n ? 'selected' : ''}" data-r="${n}">${REVIEWS[n]}</button>`).join('')}</div></div>`).join('')}</div>` : ''}`;
 

@@ -1,8 +1,10 @@
-import { api } from '../api.js';
+import { api, qs } from '../api.js';
 import { esc, cover, toast, modal, confirmBox, formData, fmtDate, plural, $, $$, debounce, resizeImage, pickImage, uploadCover } from '../ui.js';
 import { state, navigate, leaveTo, isAdmin, isCataloguer, typeLabel, loadThemes, themeChips } from '../state.js';
 import { addToListDialog } from './catalogue.js';
 import { speakButton, authorsSpoken } from '../speech.js';
+import { hyphenateIsbn } from '../isbn-format.js';
+import { navBar } from '../doc-nav.js';
 
 const STATES = { ok: 'Bon état', abime: 'Abîmé', perdu: 'Perdu', reparation: 'En réparation' };
 
@@ -22,23 +24,44 @@ function reviewSummary(d) {
   return `<p class="reviews">${[3, 2, 1].filter((n) => d.reviews[n]).map((n) => `<span title="${REVIEWS[n][1]}">${REVIEWS[n][0]} ${d.reviews[n]}</span>`).join(' ')}</p>`;
 }
 
-function renderDetail(app, d) {
+/** « Beigel, Christine ; Destours, Christine » → liens « Christine Beigel, Christine Destours » (leurs autres livres). */
+function authorLinks(authors) {
+  return String(authors).split(';').map((a) => a.trim()).filter(Boolean).map((a) => {
+    const name = a.split(',').map((x) => x.trim()).reverse().join(' ');
+    return `<a href="#/catalogue${qs({ author: a })}" title="Les autres livres de ${esc(name)}">${esc(name)}</a>`;
+  }).join(', ');
+}
+
+/** Mots-clés ou sujets séparés par « ; » → liens vers les autres livres sur le même sujet. */
+function keywordLinks(list) {
+  return String(list).split(';').map((k) => k.trim()).filter(Boolean)
+    .map((k) => `<a class="kw-link" href="#/catalogue${qs({ keyword: k })}" title="Les autres livres : ${esc(k)}">${esc(k)}</a>`).join('');
+}
+
+/** ISBN avec tirets (comme imprimé dans le livre) et code-barres EAN. */
+function isbnHtml(isbn) {
+  const h = hyphenateIsbn(isbn);
+  return h ? `${esc(h)} <span class="muted small" style="margin-left:.5rem">EAN ${esc(isbn)}</span>` : esc(isbn);
+}
+
+async function renderDetail(app, d) {
   if (state.user.role === 'eleve') return kidDetail(app, d);
   const periodical = d.doc_type === 'periodique';
+  const nav = await navBar(d.id);
   const meta = [
-    ['Auteur(s)', d.authors], ['Éditeur', d.publisher], ['Année', d.pub_year], ['Pages', d.pages],
+    ['Auteur(s)', d.authors && { html: authorLinks(d.authors) }], ['Éditeur', d.publisher], ['Année', d.pub_year], ['Pages', d.pages],
     ['Collection', d.series ? d.series + (d.series_number ? ' n° ' + d.series_number : '') : ''],
     ['Type', typeLabel(d.doc_type)],
     // ISBN toujours affiché : s'il manque, on le dit (et on propose de l'ajouter).
-    [periodical ? 'ISSN / EAN' : 'ISBN', d.isbn || { html: `<span class="muted">Non renseigné</span>
+    [periodical ? 'ISSN / EAN' : 'ISBN', d.isbn ? { html: isbnHtml(d.isbn) } : { html: `<span class="muted">Non renseigné</span>
       <a class="small" href="#/document/${d.id}/modifier" style="margin-left:.4rem">+ Ajouter</a>` }],
-    ['Mots-clés', d.keywords], ['Sujets', d.subjects], ['Public', d.audience], ['Dewey', d.dewey],
+    ['Mots-clés', d.keywords && { html: keywordLinks(d.keywords) }], ['Sujets', d.subjects && { html: keywordLinks(d.subjects) }], ['Public', d.audience], ['Dewey', d.dewey],
     ['Périodicité', d.periodicity], ['Abonnement jusqu\'au', d.subscription_end ? fmtDate(d.subscription_end) : ''],
     ['Emplacement', d.location], ['Notes', d.notes], ['Prêts au total', d.loan_count],
   ].filter(([, v]) => v !== null && v !== undefined && v !== '');
 
   app.innerHTML = `
-    <div class="page-head no-print"><a href="javascript:history.back()" class="btn btn-ghost">← Retour</a>
+    <div class="page-head no-print"><div class="row"><a href="javascript:history.back()" class="btn btn-ghost">← Retour</a>${nav}</div>
       <div class="row">
         ${isCataloguer() ? '' : `<button class="btn" id="reserve">🔖 Réserver pour…</button>
         <button class="btn" id="to-list">📋 Ajouter à une liste</button>`}

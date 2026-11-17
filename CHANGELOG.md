@@ -2,6 +2,20 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
+## [1.7.5] — 2026-11-17
+
+### Modifié — fiche d'un livre
+- **Couverture plus grande** (260 px de large au lieu de 160).
+- **Auteurs en « Prénom Nom »** (« Christine Beigel » plutôt que « Beigel, Christine »), **cliquables** : un clic montre
+  les autres livres de l'auteur.
+- **Mots-clés et sujets cliquables** (pastilles) : un clic montre les autres livres sur le même sujet.
+- **ISBN avec tirets**, comme imprimé dans le livre (978-2-278-09154-6), suivi du code-barres EAN. Livres français
+  (978-2 et 979-10), d'après les tranches officielles de l'agence internationale de l'ISBN ; les autres restent sans tirets.
+
+### Ajouté
+- **Navigation « ◀ 2/616 ▶ »** sur la fiche d'un livre, dans les résultats de la dernière recherche (Catalogue ou
+  Tous les livres), aussi avec les flèches ← → du clavier. « ← Retour » ramène toujours à la liste.
+
 ## [1.7.4] — 2026-11-17
 
 ### Corrigé

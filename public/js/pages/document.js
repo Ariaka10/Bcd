@@ -28,9 +28,13 @@ function renderDetail(app, d) {
   const meta = [
     ['Auteur(s)', d.authors], ['Éditeur', d.publisher], ['Année', d.pub_year], ['Pages', d.pages],
     ['Collection', d.series ? d.series + (d.series_number ? ' n° ' + d.series_number : '') : ''],
-    ['Type', typeLabel(d.doc_type)], ['Mots-clés', d.keywords], ['Sujets', d.subjects], ['Public', d.audience], ['Dewey', d.dewey],
+    ['Type', typeLabel(d.doc_type)],
+    // ISBN toujours affiché : s'il manque, on le dit (et on propose de l'ajouter).
+    [periodical ? 'ISSN / EAN' : 'ISBN', d.isbn || { html: `<span class="muted">Non renseigné</span>
+      <a class="small" href="#/document/${d.id}/modifier" style="margin-left:.4rem">+ Ajouter</a>` }],
+    ['Mots-clés', d.keywords], ['Sujets', d.subjects], ['Public', d.audience], ['Dewey', d.dewey],
     ['Périodicité', d.periodicity], ['Abonnement jusqu\'au', d.subscription_end ? fmtDate(d.subscription_end) : ''],
-    ['ISBN / EAN', d.isbn], ['Emplacement', d.location], ['Notes', d.notes], ['Prêts au total', d.loan_count],
+    ['Emplacement', d.location], ['Notes', d.notes], ['Prêts au total', d.loan_count],
   ].filter(([, v]) => v !== null && v !== undefined && v !== '');
 
   app.innerHTML = `
@@ -58,7 +62,7 @@ function renderDetail(app, d) {
         ${d.themes.length ? `<p>${themeChips(d.themes)}</p>` : ''}
         ${reviewSummary(d)}
         ${d.summary ? `<p>${esc(d.summary)}</p>` : ''}
-        <dl class="meta-list">${meta.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+        <dl class="meta-list">${meta.map(([k, v]) => `<dt>${k}</dt><dd>${v?.html ?? esc(v)}</dd>`).join('')}</dl>
         ${d.source_url ? `<p class="small"><a href="${esc(d.source_url)}" target="_blank" rel="noopener">Voir la notice d'origine (${esc(d.source)})</a></p>` : ''}
         ${d.lists?.length ? `<p class="small">Listes : ${d.lists.map((l) => `<a href="#/liste/${l.id}">${esc(l.name)}</a>`).join(', ')}</p>` : ''}
       </div>

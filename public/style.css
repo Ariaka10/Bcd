@@ -510,3 +510,15 @@ html.high-contrast .badge { outline: 1px solid rgba(0, 0, 0, .35); }
   padding: .4rem .6rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 #extra details { margin-top: .5rem; }
 #extra details > summary { cursor: pointer; color: var(--muted); margin-bottom: .5rem; }
+
+/* Lecture à voix haute (espace élève) */
+.speak-btn { display: inline-flex; align-items: center; justify-content: center; gap: .3rem; min-width: 2.2rem; height: 2.2rem;
+  padding: 0 .4rem; border-radius: 999px; border: 2px solid var(--line); background: var(--surface); color: var(--text);
+  font-size: 1.05rem; line-height: 1; cursor: pointer; user-select: none; vertical-align: middle; }
+.speak-btn:hover, .speak-btn:focus-visible { border-color: var(--primary); background: var(--primary-soft); }
+.speak-big { height: 3rem; padding: 0 1.1rem; font-size: 1.3rem; font-weight: 700; margin: .2rem 0 .6rem; }
+.book-card { position: relative; }
+.book-card > .speak-btn { position: absolute; top: .4rem; right: .4rem; z-index: 2; box-shadow: var(--shadow); }
+.kid-loan { position: relative; }
+.kid-loan > .speak-btn { position: absolute; top: .5rem; right: .5rem; }
+.kid-themes button .speak-btn, .kid-cats button .speak-btn { min-width: 1.8rem; height: 1.8rem; font-size: .9rem; margin-left: .35rem; }

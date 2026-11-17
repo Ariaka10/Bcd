@@ -2,6 +2,7 @@ import { api } from '../api.js';
 import { esc, cover, toast, modal, confirmBox, formData, fmtDate, plural, $, $$, debounce, resizeImage, pickImage, uploadCover } from '../ui.js';
 import { state, navigate, leaveTo, isAdmin, isCataloguer, typeLabel, loadThemes, themeChips } from '../state.js';
 import { addToListDialog } from './catalogue.js';
+import { speakButton, authorsSpoken } from '../speech.js';
 
 const STATES = { ok: 'Bon état', abime: 'Abîmé', perdu: 'Perdu', reparation: 'En réparation' };
 
@@ -246,11 +247,17 @@ function coverCredit(d) {
 /** Fiche simplifiée pour les élèves (maternelle) : grande image, avis en émojis, « Je le veux ! ». */
 function kidDetail(app, d) {
   const myRes = d.reservations[0];
+  const spoken = [
+    `${d.title}.`, d.authors ? `Un livre de ${authorsSpoken(d.authors)}.` : '',
+    d.available_count ? 'Il est dans la bibliothèque.' : 'Quelqu\'un l\'a emprunté.',
+    d.on_loan_to_me ? 'C\'est toi qui l\'as !' : myRes ? (myRes.status === 'prete' ? 'Il t\'attend : demande-le à la maîtresse !' : 'Tu l\'as réservé.') : '',
+  ].filter(Boolean).join(' ');
   app.innerHTML = `<div class="page-head"><a href="javascript:history.back()" class="btn btn-lg">⬅️ Retour</a></div>
     <div class="card kid-detail">
       ${cover(d, 'cover-xl')}
       <div class="grow">
         <h1>${esc(d.title)}</h1>
+        ${speakButton(spoken, { big: true })}
         ${d.themes.length ? `<p>${themeChips(d.themes)}</p>` : ''}
         <p class="dispo big ${d.available_count ? 'yes' : 'no'}">${d.available_count ? '✅ Il est dans la bibliothèque' : '⏳ Quelqu\'un l\'a emprunté'}</p>
         ${d.on_loan_to_me ? '<p class="big">📖 C\'est toi qui l\'as !</p>'

@@ -135,6 +135,11 @@ export function createUsbWatcher(db, { listDrives, intervalMs = 3000, onError = 
       const ev = events.at(-1);
       return ev.type === 'copied' ? { ok: true } : { ok: false, error: ev.error };
     },
+    /** Dossier des sauvegardes sur cette clé, si elle est branchée. */
+    folderOf(serial) {
+      const d = present.get(serial);
+      return d ? path.join(d.root, USB_FOLDER) : null;
+    },
     forget(serial) {
       saveKeys(db, knownKeys(db).filter((k) => k.serial !== serial));
     },

@@ -11,6 +11,13 @@ Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeu
   dans le dossier `BCD-sauvegardes` de la clé (10 gardées). Une clé est reconnue par son numéro de série, quelle que soit
   sa lettre (E:, F:…). Liste des clés dans Paramètres (« Oublier », « Proposer à nouveau »). L'ancien réglage
   « dossier de sauvegarde » reste disponible (disque externe, dossier réseau…).
+- **Vérifier une sauvegarde** (bouton « 🔍 Vérifier » sur les sauvegardes de l'ordinateur et sur les clés mémorisées
+  branchées) : contrôle complet du fichier, sans rien restaurer, et ce qu'il contient (livres, exemplaires, élèves,
+  classes, prêts, couvertures) comparé à aujourd'hui. Une clé défectueuse se repère avant d'en avoir besoin.
+- **Lecture à voix haute dans l'espace élève** : bouton 🔊 sur chaque livre, chaque thème et chaque catégorie,
+  gros bouton « 🔊 Écouter » sur la fiche d'un livre (titre, auteurs, disponibilité), et dans « Mes livres »
+  (date de retour dite en toutes lettres). Les messages (« C'est noté ! », « Merci ! ») sont lus automatiquement.
+  Voix française de Windows, sans Internet.
 
 ### Corrigé
 - Mise à jour de la version zip : le script de remplacement se termine sans code d'erreur, pour que le Terminal Windows

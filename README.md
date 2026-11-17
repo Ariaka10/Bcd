@@ -92,7 +92,7 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
 - **Aperçu avant impression** (A4, portrait ou paysage) pour toutes les impressions.
 - Connexion des élèves **sans mot de passe** : classe → avatar → code secret en pictogrammes (facultatif) ;
   **cartes de connexion** imprimables.
-- Espace élève pensé pour la maternelle : thèmes en gros boutons, couvertures, « Mes livres »,
+- Espace élève pensé pour la maternelle : thèmes en gros boutons, couvertures, **lecture à voix haute** (🔊), « Mes livres »,
   **avis en frimousses** et rayon « Coups de cœur ».
 - **Statistiques détaillées** sur l'accueil : prêts par mois, lecteurs, rotation du fonds, classes, livres et thèmes
   préférés ; bilan annuel imprimable, sans nom d'élève.

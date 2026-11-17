@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { esc, toast, formData, confirmBox, fmtDate, $, $$ } from '../ui.js';
+import { esc, toast, formData, confirmBox, fmtDate, modal, $, $$ } from '../ui.js';
 import { state, navigate } from '../state.js';
 import { runUpdate } from '../update.js';
 
@@ -183,6 +183,26 @@ const kindOf = (name) => (name.startsWith('bcd-avant-version') ? 'avant mise à 
   : KINDS[Object.keys(KINDS).find((k) => name.startsWith(k + '_'))] ?? '');
 const WARN = 'Toutes les données actuelles seront remplacées par celles de la sauvegarde. Une copie de sécurité de l\'état actuel est faite avant.';
 
+/** Résultat de la vérification d'une sauvegarde : lisible, intacte, et ce qu'elle contient (comparé à aujourd'hui). */
+function showCheck(r, where) {
+  const when = `${fmtDate(r.date)} à ${new Date(r.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+  if (!r.ok) {
+    modal('❌ Sauvegarde inutilisable', `<p>La sauvegarde du <b>${when}</b> ${esc(where)} ne peut pas être relue :
+      <b>${esc(r.error)}</b>.</p><p>Faites une nouvelle sauvegarde${where.includes('clé') ? ' sur cette clé, ou essayez une autre clé' : ''}.</p>
+      <div class="actions"><button class="btn btn-primary" data-close>Fermer</button></div>`);
+    return;
+  }
+  const rows = [['📚 Livres', 'documents'], ['🏷️ Exemplaires', 'copies'], ['🧒 Élèves', 'students'], ['🏫 Classes', 'classes'],
+    ['📖 Prêts en cours', 'active_loans'], ['🗂️ Prêts (historique)', 'loans'], ['🖼️ Couvertures', 'covers']];
+  modal('✅ Sauvegarde vérifiée', `<p>La sauvegarde du <b>${when}</b> ${esc(where)} est <b>lisible et intacte</b> :
+      elle pourrait être restaurée sans problème.</p>
+    <div class="table-wrap"><table data-no-tools><thead><tr><th></th><th class="num">Dans la sauvegarde</th><th class="num">Aujourd'hui</th></tr></thead>
+      <tbody>${rows.map(([label, k]) => `<tr><td>${label}</td><td class="num"><b>${r.contents[k] ?? '—'}</b></td>
+        <td class="num muted">${r.current?.[k] ?? '—'}</td></tr>`).join('')}</tbody></table></div>
+    <p class="small muted">Les écarts sont normaux s'il y a eu des changements depuis cette sauvegarde. Rien n'a été modifié.</p>
+    <div class="actions"><button class="btn btn-primary" data-close>OK</button></div>`);
+}
+
 function restored(r) {
   alert(`Restauration terminée : ${r.documents} documents, ${r.users} usagers.\nVeuillez vous reconnecter.`);
   location.hash = '#/connexion';
@@ -207,7 +227,8 @@ async function renderBackups() {
       ${items.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th class="num">Taille</th><th></th></tr></thead>
         <tbody>${items.map((b) => `<tr><td>${fmtDate(b.date)} ${new Date(b.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</td>
           <td>${kindOf(b.name)}</td><td class="num">${(b.size / 1024 / 1024).toFixed(1)} Mo</td>
-          <td class="num"><button class="btn btn-sm restore" data-name="${esc(b.name)}">Restaurer</button></td></tr>`).join('')}</tbody></table></div>`
+          <td class="num"><button class="btn btn-sm btn-ghost check" data-name="${esc(b.name)}">🔍 Vérifier</button>
+            <button class="btn btn-sm restore" data-name="${esc(b.name)}">Restaurer</button></td></tr>`).join('')}</tbody></table></div>`
         : '<p class="muted">Aucune pour le moment.</p>'}` : ''}`;
 
   $('#restore-file', box).onchange = async (e) => {
@@ -225,6 +246,12 @@ async function renderBackups() {
   if (now) now.onclick = async () => {
     try { await api.post('/admin/backups'); toast('Sauvegarde enregistrée'); renderBackups(); } catch (err) { toast(err.message, 'error'); }
   };
+  for (const b of $$('.check', box)) {
+    b.onclick = async () => {
+      try { showCheck(await api.post(`/admin/backups/${encodeURIComponent(b.dataset.name)}/check`), 'sur cet ordinateur'); }
+      catch (err) { toast(err.message, 'error'); }
+    };
+  }
   for (const b of $$('.restore', box)) {
     b.onclick = async () => {
       if (!(await confirmBox(`Restaurer la sauvegarde du ${b.closest('tr').cells[0].textContent} ? ${WARN}`, { danger: true, ok: 'Restaurer' }))) return;
@@ -285,7 +312,8 @@ async function renderExtra() {
           <span>🔑 <b>${esc(k.label || 'Clé sans nom')}</b>
             ${k.plugged ? '<span class="badge badge-ok">branchée</span>' : '<span class="badge">non branchée</span>'}
             <span class="muted small">— dernière copie : ${lastOf(k.last)}</span></span>
-          <button class="btn btn-sm btn-ghost forget-key" data-serial="${esc(k.serial)}">Oublier</button></li>`).join('')}</ul>`
+          <span>${k.plugged ? `<button class="btn btn-sm check-key" data-serial="${esc(k.serial)}" data-label="${esc(k.label || '')}">🔍 Vérifier la dernière sauvegarde</button>` : ''}
+            <button class="btn btn-sm btn-ghost forget-key" data-serial="${esc(k.serial)}">Oublier</button></span></li>`).join('')}</ul>`
         : '<p class="muted">Aucune pour l\'instant : branchez une clé et choisissez « Toujours sur cette clé ».</p>'}
       ${usb.ignored ? `<p class="small muted">${usb.ignored} clé${usb.ignored > 1 ? 's' : ''} à ne jamais proposer.
         <button class="btn btn-sm btn-ghost" id="reset-ignored">Proposer à nouveau</button></p>` : ''}
@@ -302,6 +330,14 @@ async function renderExtra() {
         <button class="btn btn-ghost" id="stop">Ne plus copier</button>` : ''}</div>
     ${usb.supported ? '</details>' : ''}`;
 
+  for (const b of box.querySelectorAll('.check-key')) {
+    b.onclick = async () => {
+      b.disabled = true;
+      try { showCheck(await api.post(`/app/usb/keys/${encodeURIComponent(b.dataset.serial)}/check`), `sur la clé « ${b.dataset.label || 'sans nom'} »`); }
+      catch (err) { toast(err.message, 'error'); }
+      b.disabled = false;
+    };
+  }
   for (const b of box.querySelectorAll('.forget-key')) {
     b.onclick = async () => {
       if (!(await confirmBox('Oublier cette clé ? BCD n\'y copiera plus de sauvegarde automatiquement (celles déjà copiées restent sur la clé).'))) return;

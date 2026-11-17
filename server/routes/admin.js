@@ -7,7 +7,7 @@ import { staff, admin, anyUser } from '../guards.js';
 import { fixMojibake, hasMojibake } from '../text.js';
 import { detailedStats } from '../stats.js';
 import { knownKeys } from '../usb.js';
-import { snapshot, backupFileName, autoBackup, listBackups, restoreFrom, resolveExtraDir, copyToExtraDir } from '../backup.js';
+import { snapshot, backupFileName, autoBackup, listBackups, restoreFrom, resolveExtraDir, copyToExtraDir, checkBackup, contentsOf, latestBackupIn } from '../backup.js';
 
 function tempFile() {
   return path.join(os.tmpdir(), `bcd-${randomToken().slice(0, 12)}.sqlite`);
@@ -50,6 +50,15 @@ export default function (r, { backupDir, appInfo, installUpdate, updateProgress,
   r.post('/api/admin/backups', admin, ({ db }) => {
     if (!backupDir) throw new HttpError(400, 'Dossier de sauvegarde non configuré');
     return { file: path.basename(autoBackup(db, backupDir, { keep: 30, prefix: 'bcd-manuelle' })) };
+  });
+
+  // Vérification d'une sauvegarde, sans rien restaurer (comparée à la base actuelle).
+  r.post('/api/admin/backups/:name/check', admin, ({ db, params }) => {
+    if (!backupDir) throw new HttpError(400, 'Dossier de sauvegarde non configuré');
+    const name = path.basename(params.name);
+    const file = path.join(backupDir, name);
+    if (!name.endsWith('.sqlite') || !fs.existsSync(file)) throw new HttpError(404, 'Sauvegarde introuvable');
+    return { ...checkBackup(file), current: contentsOf(db) };
   });
 
   r.post('/api/admin/backups/:name/restore', admin, ({ db, params }) => {
@@ -168,6 +177,16 @@ export default function (r, { backupDir, appInfo, installUpdate, updateProgress,
     if (!usb) throw new HttpError(400, 'Disponible seulement dans l\'application Windows');
     usb.forget(params.serial);
     return usb.status();
+  });
+
+  // Vérifie la dernière sauvegarde présente sur une clé mémorisée (branchée).
+  r.post('/api/app/usb/keys/:serial/check', admin, ({ db, params }) => {
+    if (!usb) throw new HttpError(400, 'Disponible seulement dans l\'application Windows');
+    const dir = usb.folderOf(params.serial);
+    if (!dir) throw new HttpError(409, 'Clé non branchée');
+    const last = latestBackupIn(dir);
+    if (!last) throw new HttpError(404, 'Aucune sauvegarde BCD sur cette clé');
+    return { ...checkBackup(path.join(dir, last.name)), current: contentsOf(db) };
   });
 
   r.post('/api/app/usb/reset-ignored', admin, () => {

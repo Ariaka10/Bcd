@@ -3,6 +3,7 @@ import { $, esc, toast, printPreview } from './ui.js';
 import { initTables } from './tables.js';
 import { runUpdate } from './update.js';
 import { watchUsb } from './usb.js';
+import { setAutoSpeak } from './speech.js';
 
 // Tous les boutons « Imprimer » (et Ctrl+P) ouvrent d'abord l'aperçu avant impression.
 window.bcdPrint = () => printPreview();
@@ -121,6 +122,7 @@ async function route() {
   if (!roles && state.user && mod === login) { location.hash = '#/'; return; }
 
   renderNav();
+  setAutoSpeak(state.user?.role === 'eleve');
   checkUpdate();
   watchUsb();
   // Première ouverture de l'année scolaire : l'administrateur est conduit une fois vers l'assistant de rentrée.

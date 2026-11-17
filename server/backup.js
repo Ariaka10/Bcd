@@ -69,6 +69,54 @@ export function inspectBackup(file) {
   }
 }
 
+/** Chiffres clés d'une base BCD (actuelle ou sauvegarde), pour les comparer. */
+export function contentsOf(db) {
+  const n = (sql) => {
+    try {
+      return db.prepare(sql).get().n;
+    } catch {
+      return null; // table absente dans une très vieille sauvegarde
+    }
+  };
+  return {
+    documents: n('SELECT COUNT(*) AS n FROM documents'),
+    copies: n('SELECT COUNT(*) AS n FROM copies'),
+    students: n(`SELECT COUNT(*) AS n FROM users WHERE role = 'eleve' AND active = 1`),
+    classes: n('SELECT COUNT(*) AS n FROM classes'),
+    active_loans: n('SELECT COUNT(*) AS n FROM loans WHERE returned_at IS NULL'),
+    loans: n('SELECT COUNT(*) AS n FROM loans'),
+    covers: n('SELECT COUNT(*) AS n FROM covers'),
+  };
+}
+
+/**
+ * Vérification complète d'une sauvegarde, sans rien restaurer : fichier lisible, intact (contrôle d'intégrité
+ * de toute la base) et contenu. Résultat : { ok, error?, contents, date, size }.
+ */
+export function checkBackup(file) {
+  const st = fs.statSync(file);
+  const out = { ok: false, file: path.basename(file), date: st.mtime.toISOString(), size: st.size };
+  let bk;
+  try {
+    inspectBackup(file);
+    bk = new DatabaseSync(file, { readOnly: true });
+    const problems = bk.prepare('PRAGMA integrity_check').all().map((r) => r.integrity_check).filter((m) => m !== 'ok');
+    if (problems.length) throw new Error('Sauvegarde endommagée');
+    out.contents = contentsOf(bk);
+    out.ok = true;
+  } catch (e) {
+    out.error = e.message;
+  } finally {
+    bk?.close();
+  }
+  return out;
+}
+
+/** Sauvegarde la plus récente d'un dossier (clé USB…), ou null. */
+export function latestBackupIn(dir) {
+  return listBackups(dir).find((b) => b.name.startsWith('bcd-')) ?? null;
+}
+
 /**
  * Remplace le contenu de la base par celui d'une sauvegarde.
  * Une copie de sécurité de l'état actuel est faite avant, dans `safetyDir`.

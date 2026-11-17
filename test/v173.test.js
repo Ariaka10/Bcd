@@ -7,6 +7,7 @@ import path from 'node:path';
 import { openDb } from '../server/db.js';
 import { createApp } from '../server/app.js';
 import { createUsbWatcher, USB_FOLDER } from '../server/usb.js';
+import { checkBackup } from '../server/backup.js';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bcd-usb-'));
 // Deux fausses clés : chacune est un dossier (« racine » de la clé).
@@ -108,6 +109,24 @@ test('« une seule fois », « ne jamais demander » et clé retirée avant la r
   assert.equal((await call('POST', '/api/app/usb/answer', { serial: KEY_B.serial, choice: 'bizarre' })).status, 400);
 });
 
+test('vérifier une sauvegarde : sur la clé, intacte, puis abîmée', async () => {
+  const r = (await call('POST', `/api/app/usb/keys/${KEY_A.serial}/check`)).data;
+  assert.equal(r.ok, true);
+  assert.equal(r.contents.documents, r.current.documents);
+  assert.equal(typeof r.contents.students, 'number');
+  // Clé inconnue ou débranchée
+  assert.equal((await call('POST', '/api/app/usb/keys/INCONNUE/check')).status, 409);
+  // Fichier abîmé (coupé en deux) : signalé comme inutilisable
+  const file = path.join(tmp, 'abimee.sqlite');
+  const good = fs.readFileSync(path.join(KEY_A.root, USB_FOLDER, backups(KEY_A).sort().at(-1)));
+  fs.writeFileSync(file, good.subarray(0, Math.floor(good.length / 2)));
+  const bad = checkBackup(file);
+  assert.equal(bad.ok, false);
+  assert.ok(bad.error);
+  fs.writeFileSync(file, 'pas une base');
+  assert.equal(checkBackup(file).ok, false);
+});
+
 test('fermeture : copie sur les clés mémorisées branchées ; oublier une clé', async () => {
   const before = (await call('GET', '/api/app/usb')).data.events.length;
   usb.copyOnQuit();
@@ -138,4 +157,12 @@ test('lecture des lecteurs donnés par Windows', async () => {
     { letter: 'E', root: 'E:\\', serial: '1A2B3C4D', label: 'ÉCOLE' });
   assert.equal(parseDrive({ DeviceID: 'F:', VolumeSerialNumber: null }), null); // lecteur de cartes vide
   assert.equal(parseDrive({ DeviceID: 'G:', VolumeSerialNumber: 'X', VolumeName: '' }).label, null);
+});
+
+test('lecture à voix haute : textes prêts à être lus', async () => {
+  const { sayable, authorsSpoken, dateSpoken } = await import('../public/js/speech.js');
+  assert.equal(sayable('✅ Il est dans la bibliothèque 🎉'), 'Il est dans la bibliothèque');
+  assert.equal(authorsSpoken('Donaldson, Julia ; Scheffler, Axel'), 'Julia Donaldson et Axel Scheffler');
+  assert.equal(authorsSpoken('Ponti, Claude'), 'Claude Ponti');
+  assert.equal(dateSpoken('2026-12-03'), 'jeudi 3 décembre');
 });

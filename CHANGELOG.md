@@ -2,6 +2,16 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
+## [1.7.4] — 2026-11-17
+
+### Corrigé
+- **Liste des sauvegardes** : boutons « 🔍 Vérifier » et « ↩️ Restaurer » côte à côte et alignés (ils se décalaient
+  l'un au-dessus de l'autre), de même pour les clés mémorisées. Taille affichée à la française (« 2,0 Mo »).
+
+### Modifié
+- **Fiche d'un livre** : l'ISBN est toujours affiché, juste après le type ; s'il manque : « ISBN : Non renseigné »,
+  avec un lien « + Ajouter » vers la modification de la fiche.
+
 ## [1.7.3] — 2026-11-17
 
 ### Ajouté

@@ -226,9 +226,9 @@ async function renderBackups() {
         Dossier : <code>${esc(dir)}</code></p>
       ${items.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th class="num">Taille</th><th></th></tr></thead>
         <tbody>${items.map((b) => `<tr><td>${fmtDate(b.date)} ${new Date(b.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</td>
-          <td>${kindOf(b.name)}</td><td class="num">${(b.size / 1024 / 1024).toFixed(1)} Mo</td>
-          <td class="num"><button class="btn btn-sm btn-ghost check" data-name="${esc(b.name)}">🔍 Vérifier</button>
-            <button class="btn btn-sm restore" data-name="${esc(b.name)}">Restaurer</button></td></tr>`).join('')}</tbody></table></div>`
+          <td>${kindOf(b.name)}</td><td class="num">${(b.size / 1024 / 1024).toFixed(1).replace('.', ',')} Mo</td>
+          <td class="num"><div class="row-actions"><button class="btn btn-sm check" data-name="${esc(b.name)}">🔍 Vérifier</button>
+            <button class="btn btn-sm restore" data-name="${esc(b.name)}">↩️ Restaurer</button></div></td></tr>`).join('')}</tbody></table></div>`
         : '<p class="muted">Aucune pour le moment.</p>'}` : ''}`;
 
   $('#restore-file', box).onchange = async (e) => {
@@ -312,7 +312,7 @@ async function renderExtra() {
           <span>🔑 <b>${esc(k.label || 'Clé sans nom')}</b>
             ${k.plugged ? '<span class="badge badge-ok">branchée</span>' : '<span class="badge">non branchée</span>'}
             <span class="muted small">— dernière copie : ${lastOf(k.last)}</span></span>
-          <span>${k.plugged ? `<button class="btn btn-sm check-key" data-serial="${esc(k.serial)}" data-label="${esc(k.label || '')}">🔍 Vérifier la dernière sauvegarde</button>` : ''}
+          <span class="row-actions">${k.plugged ? `<button class="btn btn-sm check-key" data-serial="${esc(k.serial)}" data-label="${esc(k.label || '')}">🔍 Vérifier la dernière sauvegarde</button>` : ''}
             <button class="btn btn-sm btn-ghost forget-key" data-serial="${esc(k.serial)}">Oublier</button></span></li>`).join('')}</ul>`
         : '<p class="muted">Aucune pour l\'instant : branchez une clé et choisissez « Toujours sur cette clé ».</p>'}
       ${usb.ignored ? `<p class="small muted">${usb.ignored} clé${usb.ignored > 1 ? 's' : ''} à ne jamais proposer.

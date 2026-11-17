@@ -522,3 +522,6 @@ html.high-contrast .badge { outline: 1px solid rgba(0, 0, 0, .35); }
 .kid-loan { position: relative; }
 .kid-loan > .speak-btn { position: absolute; top: .5rem; right: .5rem; }
 .kid-themes button .speak-btn, .kid-cats button .speak-btn { min-width: 1.8rem; height: 1.8rem; font-size: .9rem; margin-left: .35rem; }
+
+/* Boutons d'action d'une ligne de tableau : côte à côte, alignés à droite */
+.row-actions { display: flex; gap: .4rem; justify-content: flex-end; align-items: center; flex-wrap: nowrap; }

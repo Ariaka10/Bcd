@@ -1,5 +1,6 @@
 /** Catalogue : recherche, « Tous les livres » (inventaire complet) et gestion des thèmes. */
 import { api, qs } from '../api.js';
+import { rememberResults } from '../doc-nav.js';
 import { esc, cover, toast, modal, confirmBox, formData, plural, readTextFile, debounce, $, $$ } from '../ui.js';
 import { state, navigate, isAdmin, isCataloguer, typeLabel, loadThemes, themeChips } from '../state.js';
 
@@ -35,6 +36,7 @@ async function renderSearch(app, query) {
   const hasAdv = ADV_FIELDS.some((f) => q[f]);
   const types = Object.entries(state.meta.doc_types);
   const res = await api.get('/documents' + qs({ ...q, limit: 30 }));
+  rememberResults(q, 'Résultats de la recherche');
   const pages = Math.ceil(res.total / res.limit);
 
   app.innerHTML = `
@@ -111,6 +113,7 @@ async function renderInventory(app, query) {
   const q = { sort: 'number', ...query };
   const types = Object.entries(state.meta.doc_types);
   const res = await api.get('/documents' + qs({ ...q, limit: 5000 }));
+  rememberResults(q, 'Tous les livres');
   const copies = res.items.reduce((n, d) => n + d.copies_count, 0);
   const available = res.items.reduce((n, d) => n + d.available_count, 0);
   const stateLabel = (s) => [...new Set(String(s ?? '').split(','))].filter((x) => x && x !== 'ok').map((x) => STATES[x]).join(', ');

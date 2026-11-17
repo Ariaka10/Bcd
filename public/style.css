@@ -525,3 +525,14 @@ html.high-contrast .badge { outline: 1px solid rgba(0, 0, 0, .35); }
 
 /* Boutons d'action d'une ligne de tableau : côte à côte, alignés à droite */
 .row-actions { display: flex; gap: .4rem; justify-content: flex-end; align-items: center; flex-wrap: nowrap; }
+
+/* Fiche d'un livre (1.7.5) : couverture plus grande, liens auteurs / mots-clés, navigation entre résultats */
+.doc-detail { grid-template-columns: 260px 1fr; }
+.doc-detail .cover-lg { width: 100%; }
+@media (max-width: 700px) { .doc-detail .cover-lg { width: 160px; } }
+.meta-list dd a { color: var(--primary); text-decoration: none; }
+.meta-list dd a:hover { text-decoration: underline; }
+.kw-link { display: inline-block; padding: .05rem .55rem; margin: 0 .3rem .3rem 0; border-radius: 999px; background: var(--primary-soft);
+  font-size: .9rem; }
+.doc-nav { display: inline-flex; align-items: center; gap: .4rem; margin-left: .5rem; color: var(--muted); }
+.doc-nav b { color: var(--text); }

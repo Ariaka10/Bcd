@@ -326,6 +326,14 @@ export default function (r, deps) {
     return searchDocuments(db, q);
   });
 
+  // Numéros des documents d'une recherche, dans l'ordre affiché : « ◀ 3/616 ▶ » sur la fiche d'un livre.
+  r.get('/api/documents/ids', anyUser, ({ db, query, user }) => {
+    if (user.role === 'eleve') throw new HttpError(403, 'Accès réservé aux adultes');
+    const { sql, args } = buildSearch(query);
+    const order = SORTS[query.sort] ?? (query.q ? SORTS.title : SORTS.recent);
+    return { ids: db.prepare(`SELECT d.id FROM documents d ${sql} ORDER BY ${order} LIMIT 5000`).all(...args).map((x) => x.id) };
+  });
+
   // Coups de cœur : livres les plus « adorés » par les élèves.
   r.get('/api/coups-de-coeur', anyUser, ({ db, user }) => {
     const restrict = restrictForStudent(db, user);

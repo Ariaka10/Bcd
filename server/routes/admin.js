@@ -6,13 +6,14 @@ import { getSettings, DEFAULT_SETTINGS, ensureDefaults, currentSchoolYear } from
 import { staff, admin, anyUser } from '../guards.js';
 import { fixMojibake, hasMojibake } from '../text.js';
 import { detailedStats } from '../stats.js';
+import { knownKeys } from '../usb.js';
 import { snapshot, backupFileName, autoBackup, listBackups, restoreFrom, resolveExtraDir, copyToExtraDir } from '../backup.js';
 
 function tempFile() {
   return path.join(os.tmpdir(), `bcd-${randomToken().slice(0, 12)}.sqlite`);
 }
 
-export default function (r, { backupDir, appInfo, installUpdate, updateProgress, checkUpdate, chooseFolder, covers } = {}) {
+export default function (r, { backupDir, appInfo, installUpdate, updateProgress, checkUpdate, chooseFolder, usb, covers } = {}) {
   /* ----- Couvertures manquantes : recherche sur Internet, un livre à la fois ----- */
   r.get('/api/admin/covers', admin, () => covers.status());
   r.post('/api/admin/covers/start', admin, ({ body }) => covers.start({ retry: !!body?.retry }));
@@ -151,6 +152,30 @@ export default function (r, { backupDir, appInfo, installUpdate, updateProgress,
     return extraInfo(db);
   });
 
+  /* ----- Clés USB repérées automatiquement (application Windows) ----- */
+
+  r.get('/api/app/usb', admin, () => (usb ? usb.status() : { supported: false }));
+
+  r.post('/api/app/usb/answer', admin, ({ body }) => {
+    if (!usb) throw new HttpError(400, 'Disponible seulement dans l\'application Windows');
+    if (!['always', 'once', 'later', 'never'].includes(body?.choice)) throw new HttpError(400, 'Choix inconnu');
+    const r2 = usb.answer(String(body.serial ?? ''), body.choice);
+    if (!r2.ok) throw new HttpError(409, `Copie impossible : ${r2.error}`);
+    return usb.status();
+  });
+
+  r.delete('/api/app/usb/keys/:serial', admin, ({ params }) => {
+    if (!usb) throw new HttpError(400, 'Disponible seulement dans l\'application Windows');
+    usb.forget(params.serial);
+    return usb.status();
+  });
+
+  r.post('/api/app/usb/reset-ignored', admin, () => {
+    if (!usb) throw new HttpError(400, 'Disponible seulement dans l\'application Windows');
+    usb.resetIgnored();
+    return usb.status();
+  });
+
   r.post('/api/app/choose-folder', admin, async () => {
     if (!chooseFolder) throw new HttpError(400, 'Disponible seulement dans l\'application Windows');
     return { dir: await chooseFolder() };
@@ -164,7 +189,7 @@ export default function (r, { backupDir, appInfo, installUpdate, updateProgress,
     const extra = extraInfo(db);
     return {
       rentree: s.school_year_done !== year ? year : null,
-      extra_backup_days: extra.dir && (extra.days_since === null || extra.days_since >= 7) ? extra.days_since ?? -1 : null,
+      extra_backup_days: (extra.dir || knownKeys(db).length) && (extra.days_since === null || extra.days_since >= 7) ? extra.days_since ?? -1 : null,
     };
   });
 

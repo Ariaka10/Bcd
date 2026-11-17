@@ -2,6 +2,20 @@
 
 Toutes les évolutions notables de **BCD**. Les numéros suivent la forme `majeure.mineure.correctif`.
 
+## [1.7.3] — 2026-11-17
+
+### Ajouté
+- **Clé USB repérée dès qu'elle est branchée** (application Windows) : l'administrateur se voit proposer d'y faire une
+  sauvegarde — « Toujours sur cette clé », « Une seule fois », « Pas maintenant » ou « Ne jamais demander pour cette clé ».
+- **Clés mémorisées** : la sauvegarde y est copiée automatiquement dès qu'on les branche et à chaque fermeture de BCD,
+  dans le dossier `BCD-sauvegardes` de la clé (10 gardées). Une clé est reconnue par son numéro de série, quelle que soit
+  sa lettre (E:, F:…). Liste des clés dans Paramètres (« Oublier », « Proposer à nouveau »). L'ancien réglage
+  « dossier de sauvegarde » reste disponible (disque externe, dossier réseau…).
+
+### Corrigé
+- Mise à jour de la version zip : le script de remplacement se termine sans code d'erreur, pour que le Terminal Windows
+  ferme sa fenêtre même dans le cas de secours.
+
 ## [1.7.2] — 2026-11-15
 
 ### Corrigé

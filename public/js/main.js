@@ -2,6 +2,7 @@ import { api } from './api.js';
 import { $, esc, toast, printPreview } from './ui.js';
 import { initTables } from './tables.js';
 import { runUpdate } from './update.js';
+import { watchUsb } from './usb.js';
 
 // Tous les boutons « Imprimer » (et Ctrl+P) ouvrent d'abord l'aperçu avant impression.
 window.bcdPrint = () => printPreview();
@@ -121,6 +122,7 @@ async function route() {
 
   renderNav();
   checkUpdate();
+  watchUsb();
   // Première ouverture de l'année scolaire : l'administrateur est conduit une fois vers l'assistant de rentrée.
   if (path === '/' && state.user.role === 'admin' && !state.rentreeShown) {
     state.rentreeShown = true;

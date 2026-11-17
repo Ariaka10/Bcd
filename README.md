@@ -104,8 +104,10 @@ Au premier lancement, l'application demande le nom de l'école et crée le compt
 - Les données restent **sur l'ordinateur** (`Documents\BCD`), rien n'est ouvert sur le réseau.
   Internet ne sert qu'à chercher les notices et les couvertures par ISBN, titre ou auteur (BnF, Open Library, Google Books)
   et à vérifier les mises à jour : aucune donnée d'élève n'est envoyée.
-- **Sauvegarde automatique** toutes les 30 minutes pendant l'utilisation et à chaque fermeture, **copie sur clé USB**,
-  restauration en un clic. Chaque modification est enregistrée immédiatement : une coupure de courant ne fait pas perdre la journée.
+- **Sauvegarde automatique** toutes les 30 minutes pendant l'utilisation et à chaque fermeture, restauration en un clic.
+  Chaque modification est enregistrée immédiatement : une coupure de courant ne fait pas perdre la journée.
+- **Clé USB repérée dès qu'elle est branchée** : BCD propose d'y faire une sauvegarde ; une clé mémorisée la reçoit
+  automatiquement (au branchement et à chaque fermeture), même si Windows lui donne une autre lettre.
 - **Assistant de rentrée** : suppression des données des élèves partis (RGPD).
 - Copie de sécurité avant chaque mise à jour de l'application.
 
@@ -148,6 +150,7 @@ server/              API HTTP (Node.js)
   catalog-import.js  import Hibouthèque / CSV / XML
   cote.js            calcul des cotes
   backup.js          sauvegardes, clé USB, restauration
+  usb.js             clés USB repérées au branchement
 public/              interface (HTML, CSS, JavaScript)
 test/                tests automatiques (node:test)
 docs/captures/       captures d'écran (données fictives)

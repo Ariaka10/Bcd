@@ -263,15 +263,33 @@ async function renderVersion() {
 
 /* ---------- Copie sur clé USB ---------- */
 
+// Réponse à « Clé USB détectée » : la carte se met à jour si la page Paramètres est ouverte.
+window.addEventListener('bcd-usb-changed', () => renderExtra());
+
 async function renderExtra() {
   const box = $('#extra');
   if (!box) return; // page quittée entre-temps
-  const [x, info] = await Promise.all([api.get('/admin/extra-backup'), api.get('/app/info').catch(() => ({}))]);
-  const when = x.last ? `${fmtDate(x.last)} à ${new Date(x.last).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'jamais';
+  const [x, info, usb] = await Promise.all([api.get('/admin/extra-backup'), api.get('/app/info').catch(() => ({})),
+    api.get('/app/usb').catch(() => ({ supported: false }))]);
+  if (!$('#extra')) return;
+  const lastOf = (d) => (d ? `${fmtDate(d)} à ${new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'jamais');
+  const when = lastOf(x.last);
   box.innerHTML = `<h2 style="margin-top:0">🔑 Copie sur une clé USB</h2>
     <p class="muted">Si l'ordinateur tombe en panne, les sauvegardes qu'il contient sont perdues avec lui.
-      Choisissez un dossier sur une clé USB : à chaque fermeture de l'application, si la clé est branchée, une sauvegarde y est copiée
-      (les 10 dernières sont gardées). Un rappel s'affiche si aucune copie n'a été faite depuis 7 jours.</p>
+      ${usb.supported ? `<b>Branchez simplement une clé USB</b> : BCD propose d'y faire une sauvegarde. Une clé mémorisée
+      (« Toujours sur cette clé ») reçoit une sauvegarde dès qu'elle est branchée et à chaque fermeture, quelle que soit sa lettre (E:, F:…).`
+      : 'Choisissez un dossier sur une clé USB : à chaque fermeture de l\'application, si la clé est branchée, une sauvegarde y est copiée.'}
+      Les 10 dernières sont gardées. Un rappel s'affiche si aucune copie n'a été faite depuis 7 jours.</p>
+    ${usb.supported ? `<h3>Clés mémorisées</h3>
+      ${usb.keys.length ? `<ul class="usb-keys">${usb.keys.map((k) => `<li>
+          <span>🔑 <b>${esc(k.label || 'Clé sans nom')}</b>
+            ${k.plugged ? '<span class="badge badge-ok">branchée</span>' : '<span class="badge">non branchée</span>'}
+            <span class="muted small">— dernière copie : ${lastOf(k.last)}</span></span>
+          <button class="btn btn-sm btn-ghost forget-key" data-serial="${esc(k.serial)}">Oublier</button></li>`).join('')}</ul>`
+        : '<p class="muted">Aucune pour l\'instant : branchez une clé et choisissez « Toujours sur cette clé ».</p>'}
+      ${usb.ignored ? `<p class="small muted">${usb.ignored} clé${usb.ignored > 1 ? 's' : ''} à ne jamais proposer.
+        <button class="btn btn-sm btn-ghost" id="reset-ignored">Proposer à nouveau</button></p>` : ''}
+      <details${x.dir ? ' open' : ''}><summary>Autre dossier de sauvegarde (disque externe, dossier réseau…)</summary>` : ''}
     ${x.dir ? `<p>Dossier : <code>${esc(x.dir)}</code>
         ${x.available ? `<span class="badge badge-ok">✅ branchée${x.resolved !== x.dir ? ` (en ${esc(x.resolved.slice(0, 2))})` : ''}</span>`
           : '<span class="badge badge-late">clé non branchée</span>'}<br>
@@ -281,7 +299,19 @@ async function renderExtra() {
       ${info.desktop ? '<button class="btn btn-primary" id="choose">📁 Choisir le dossier…</button>'
         : '<input id="dir-input" placeholder="Chemin du dossier, ex. E:\\BCD-sauvegardes" style="max-width:22rem"><button class="btn btn-primary" id="save-dir">Enregistrer</button>'}
       ${x.dir ? `<button class="btn" id="run" ${x.available ? '' : 'disabled'}>💾 Copier maintenant</button>
-        <button class="btn btn-ghost" id="stop">Ne plus copier</button>` : ''}</div>`;
+        <button class="btn btn-ghost" id="stop">Ne plus copier</button>` : ''}</div>
+    ${usb.supported ? '</details>' : ''}`;
+
+  for (const b of box.querySelectorAll('.forget-key')) {
+    b.onclick = async () => {
+      if (!(await confirmBox('Oublier cette clé ? BCD n\'y copiera plus de sauvegarde automatiquement (celles déjà copiées restent sur la clé).'))) return;
+      await api.del(`/app/usb/keys/${encodeURIComponent(b.dataset.serial)}`);
+      toast('Clé oubliée');
+      renderExtra();
+    };
+  }
+  const reset = $('#reset-ignored', box);
+  if (reset) reset.onclick = async () => { await api.post('/app/usb/reset-ignored'); toast('Ces clés seront de nouveau proposées'); renderExtra(); };
 
   const save = async (dir) => {
     try {
